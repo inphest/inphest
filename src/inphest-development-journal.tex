@@ -25,12 +25,29 @@
 \begin{document}
 
 \title{INPHEST Development Journal}
+\maketitle
 
 \section{Simulation of Summary Statistics}
 \label{summary-statistics-simulation-workflow} % Note: to create an within-document reference here, use: 'See \href{\#summary-statistics-simulation-workflow}{here}'
 
 \begin{enumerate}
     \item Sample host tree $\hostTree$.
+    \begin{description}
+        \item[Inputs]
+            \begin{itemize}
+                \item Sequence data.
+                \item Divergence time calibration priors.
+            \end{itemize}
+        \item[Outputs]
+            \begin{itemize}
+                \item Ultrametric phylogeny.
+            \end{itemize}
+        \item[Remarks]
+            \begin{itemize}
+                \item Use \texttt{BEAST} to sample from the posterior distribution of trees given the data.
+            \end{itemize}
+    \end{description}
+
     \item Sample augmented host tree $\augmentedHostTree$, conditioned on host tree, $\hostTree$.
     \item Extract schedule of events from augmented host tree, $\augmentedHostTree$.
     \item Simulate symbiont tree, $\symbiontTree$, conditioned on schedule of events on host tree.

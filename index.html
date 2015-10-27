@@ -13,7 +13,25 @@
 </div>
 <h1 id="summary-statistics-simulation-workflow">Simulation of Summary Statistics</h1>
 <ol>
-<li><p>Sample host tree <span class="math inline"><em>η</em></span>.</p></li>
+<li><p>Sample host tree <span class="math inline"><em>η</em></span>.</p>
+<dl>
+<dt>Inputs</dt>
+<dd><ul>
+<li><p>Sequence data.</p></li>
+<li><p>Divergence time calibration priors.</p></li>
+</ul>
+</dd>
+<dt>Outputs</dt>
+<dd><ul>
+<li><p>Ultrametric phylogeny.</p></li>
+</ul>
+</dd>
+<dt>Remarks</dt>
+<dd><ul>
+<li><p>Use <code>BEAST</code> to sample from the posterior distribution of trees given the data.</p></li>
+</ul>
+</dd>
+</dl></li>
 <li><p>Sample augmented host tree <span class="math inline"><em>η</em><sup>*</sup></span>, conditioned on host tree, <span class="math inline"><em>η</em></span>.</p></li>
 <li><p>Extract schedule of events from augmented host tree, <span class="math inline"><em>η</em><sup>*</sup></span>.</p></li>
 <li><p>Simulate symbiont tree, <span class="math inline"><em>ψ</em></span>, conditioned on schedule of events on host tree.</p></li>
