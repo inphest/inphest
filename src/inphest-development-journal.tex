@@ -1,0 +1,39 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Preamble
+
+%%% Document Type
+\documentclass[11pt]{article}
+
+%%% Packages
+\usepackage{amsmath,amssymb,cancel,units} % math environment and symbols
+\usepackage{array}                        % for better arrays (eg matrices) in maths
+\usepackage{paralist}                     % very flexible & customisable lists (eg. enumerate/itemize, etc.)
+\usepackage{verbatim}                     % adds environment for commenting out blocks of text & for better verbatim
+\usepackage[pdftex,bookmarks,colorlinks,breaklinks]{hyperref}  % PDF hyperlinks, with coloured links
+\usepackage{memhfixc}                     % remove conflict between the memoir class & hyperref
+\usepackage{graphicx}                     % Add graphics capabilities
+\usepackage{xspace}                        % smart space insertion after commands
+
+%%% Notation and Variables
+\newcommand{\hostTree}{\eta}
+\newcommand{\augmentedHostTree}{\hostTree^{*}}
+\newcommand{\symbiontTree}{\psi}
+\newcommand{\scaledSymbiontTree}{\psi\prime}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Main Document
+\begin{document}
+
+\section{Simulation of Summary Statistics}
+\label{simulation-workflow} % Note: to create an within-document reference here, use: 'See \href{\#simulation-workflow}{here}'
+
+\begin{enumerate}
+    \item Sample host tree $\hostTree$.
+    \item Sample augmented host tree $\augmentedHostTree$, conditioned on host tree, $\hostTree$.
+    \item Extract schedule of events from augmented host tree, $\augmentedHostTree$.
+    \item Simulate symbiont tree, $\symbiontTree$, conditioned on schedule of events on host tree.
+    \item Scale symbiont tree by each substitution rate scaling factor to yield scaled symbiont tree $\scaledSymbiontTree$.
+    \item Calculate summary statistics on scaled symbiont tree, $\scaledSymbiontTree$.
+\end{enumerate}
+
+\end{document}
