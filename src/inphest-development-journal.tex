@@ -15,8 +15,12 @@
 \usepackage{xspace}                        % smart space insertion after commands
 
 %%% Notation and Variables
-\newcommand{\hostTree}{\eta}
-\newcommand{\augmentedHostTree}{\hostTree^{*}}
+\newcommand{\hostTreeSamples}{\mathcal{H}}
+\newcommand{\targetHostTree}{\bar{H}}
+\newcommand{\augmentedHostTreeSamples}{\mathbf{h}^{*}}
+\newcommand{\simulationTime}{\tau}
+\newcommand{\hostEvent}{\eta}
+\newcommand{\hostEventSchedule}{\mathbb{E}}
 \newcommand{\symbiontTree}{\psi}
 \newcommand{\scaledSymbiontTree}{\psi\prime}
 
@@ -31,7 +35,7 @@
 \label{summary-statistics-simulation-workflow} % Note: to create an within-document reference here, use: 'See \href{\#summary-statistics-simulation-workflow}{here}'
 
 \begin{enumerate}
-    \item Sample host tree $\hostTree$.
+    \item Generate target host tree $\targetHostTree$.
     \begin{description}
         \item[Inputs]
             \begin{itemize}
@@ -40,19 +44,42 @@
             \end{itemize}
         \item[Outputs]
             \begin{itemize}
-                \item Ultrametric phylogeny.
+                \item Time-calibrated phylogeny, $\targetHostTree$.
             \end{itemize}
-        \item[Remarks]
+        \item[Procedure]
             \begin{itemize}
-                \item Use \texttt{BEAST} to sample from the posterior distribution of trees given the data.
+                \item Use \texttt{BEAST} to generate sample from the posterior distribution of trees given the data, $\hostTreeSamples$.
+                \item Summarize $\hostTreeSamples$ using MCCT or other criteria to produce $\targetHostTree$.
             \end{itemize}
     \end{description}
 
-    \item Sample augmented host tree $\augmentedHostTree$, conditioned on host tree, $\hostTree$.
-    \item Extract schedule of events from augmented host tree, $\augmentedHostTree$.
-    \item Simulate symbiont tree, $\symbiontTree$, conditioned on schedule of events on host tree.
-    \item Scale symbiont tree by each substitution rate scaling factor to yield scaled symbiont tree $\scaledSymbiontTree$.
-    \item Calculate summary statistics on scaled symbiont tree, $\scaledSymbiontTree$.
+    \item Generate samples of augmented host trees, $\augmentedHostTreeSamples$, conditioned on target host tree, $\targetHostTree$.
+    \begin{description}
+        \item[Inputs]
+            \begin{itemize}
+                \item Time-calibrated phylogeny, $\targetHostTree$.
+                \item Labeling of tips on $\targetHostTree$ by geography (distributional range, specified as presence/absence over set of areas, for each tip).
+            \end{itemize}
+        \item[Outputs]
+            \begin{itemize}
+                \item Samples of host tree augmented with biogeographical history $\augmentedHostTreeSamples$.
+            \end{itemize}
+        \item[Procedure]
+            \begin{itemize}
+                \item Use \texttt{BayArea} or \texttt{RevBayes} to generate stochastic mapped samples.
+            \end{itemize}
+    \end{description}
+
+\item For \textit{each} augmented host tree, derive schedule of events, $\hostEventSchedule$, consisting of ordered pairs of $(\simulationTime, \hostEvent)$, where $\simulationTime$ is the simulation time of an event and $\hostEvent$ is the event (host speciation, host extinction, host dispersal, etc.) that occurs at that time on that particular tree.
+
+    \item For each simulation replicate:
+    \begin{enumerate}
+        \item Sample a schedule of events, $\hostEventSchedule$.
+        \item Simulate symbiont tree, $\symbiontTree$, conditioned on the schedule of events on host tree.
+        \item Scale symbiont tree by each substitution rate scaling factor to yield scaled symbiont tree $\scaledSymbiontTree$.
+        \item Calculate summary statistics on scaled symbiont tree, $\scaledSymbiontTree$.
+    \end{enumerate}
+
 \end{enumerate}
 
 \end{document}

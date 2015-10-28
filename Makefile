@@ -6,4 +6,8 @@ FIGS = $(wildcard src/figs/*)
 all: index.html
 
 index.html: src/inphest-development-journal.tex $(BIBFILES) $(FIGS)
-	pandoc -s -o $@ src/inphest-development-journal.tex
+	pandoc --mathjax='http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML' \
+		   --standalone \
+		   -s \
+		   -o $@  \
+		   src/inphest-development-journal.tex

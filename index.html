@@ -6,6 +6,7 @@
   <meta name="generator" content="pandoc" />
   <title>INPHEST Development Journal</title>
   <style type="text/css">code{white-space: pre;}</style>
+  <script src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"></script>
 </head>
 <body>
 <div id="header">
@@ -13,7 +14,7 @@
 </div>
 <h1 id="summary-statistics-simulation-workflow">Simulation of Summary Statistics</h1>
 <ol>
-<li><p>Sample host tree <span class="math inline"><em>η</em></span>.</p>
+<li><p>Generate target host tree <span class="math inline">\({\bar{H}}\)</span>.</p>
 <dl>
 <dt>Inputs</dt>
 <dd><ul>
@@ -23,20 +24,43 @@
 </dd>
 <dt>Outputs</dt>
 <dd><ul>
-<li><p>Ultrametric phylogeny.</p></li>
+<li><p>Time-calibrated phylogeny, <span class="math inline">\({\bar{H}}\)</span>.</p></li>
 </ul>
 </dd>
-<dt>Remarks</dt>
+<dt>Procedure</dt>
 <dd><ul>
-<li><p>Use <code>BEAST</code> to sample from the posterior distribution of trees given the data.</p></li>
+<li><p>Use <code>BEAST</code> to generate sample from the posterior distribution of trees given the data, <span class="math inline">\({\mathcal{H}}\)</span>.</p></li>
+<li><p>Summarize <span class="math inline">\({\mathcal{H}}\)</span> using MCCT or other criteria to produce <span class="math inline">\({\bar{H}}\)</span>.</p></li>
 </ul>
 </dd>
 </dl></li>
-<li><p>Sample augmented host tree <span class="math inline"><em>η</em><sup>*</sup></span>, conditioned on host tree, <span class="math inline"><em>η</em></span>.</p></li>
-<li><p>Extract schedule of events from augmented host tree, <span class="math inline"><em>η</em><sup>*</sup></span>.</p></li>
-<li><p>Simulate symbiont tree, <span class="math inline"><em>ψ</em></span>, conditioned on schedule of events on host tree.</p></li>
-<li><p>Scale symbiont tree by each substitution rate scaling factor to yield scaled symbiont tree <span class="math inline"><em>ψ</em>′</span>.</p></li>
-<li><p>Calculate summary statistics on scaled symbiont tree, <span class="math inline"><em>ψ</em>′</span>.</p></li>
+<li><p>Generate samples of augmented host trees, <span class="math inline">\({\mathbf{h}^{*}}\)</span>, conditioned on target host tree, <span class="math inline">\({\bar{H}}\)</span>.</p>
+<dl>
+<dt>Inputs</dt>
+<dd><ul>
+<li><p>Time-calibrated phylogeny, <span class="math inline">\({\bar{H}}\)</span>.</p></li>
+<li><p>Labeling of tips on <span class="math inline">\({\bar{H}}\)</span> by geography (distributional range, specified as presence/absence over set of areas, for each tip).</p></li>
+</ul>
+</dd>
+<dt>Outputs</dt>
+<dd><ul>
+<li><p>Samples of host tree augmented with biogeographical history <span class="math inline">\({\mathbf{h}^{*}}\)</span>.</p></li>
+</ul>
+</dd>
+<dt>Procedure</dt>
+<dd><ul>
+<li><p>Use <code>BayArea</code> or <code>RevBayes</code> to generate stochastic mapped samples.</p></li>
+</ul>
+</dd>
+</dl></li>
+<li><p>For <em>each</em> augmented host tree, derive schedule of events, <span class="math inline">\({\mathbb{E}}\)</span>, consisting of ordered pairs of <span class="math inline">\(({\tau}, {\eta})\)</span>, where <span class="math inline">\({\tau}\)</span> is the simulation time of an event and <span class="math inline">\({\eta}\)</span> is the event (host speciation, host extinction, host dispersal, etc.) that occurs at that time on that particular tree.</p></li>
+<li><p>For each simulation replicate:</p>
+<ol>
+<li><p>Sample a schedule of events, <span class="math inline">\({\mathbb{E}}\)</span>.</p></li>
+<li><p>Simulate symbiont tree, <span class="math inline">\({\psi}\)</span>, conditioned on the schedule of events on host tree.</p></li>
+<li><p>Scale symbiont tree by each substitution rate scaling factor to yield scaled symbiont tree <span class="math inline">\({\psi\prime}\)</span>.</p></li>
+<li><p>Calculate summary statistics on scaled symbiont tree, <span class="math inline">\({\psi\prime}\)</span>.</p></li>
+</ol></li>
 </ol>
 </body>
 </html>
