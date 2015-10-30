@@ -17,13 +17,13 @@
 \usepackage[table]{xcolor} % http://tex.stackexchange.com/questions/5363/how-to-create-alternating-rows-in-a-table
 
 %%% Notation and Variables
-\newcommand{\hostTreeSamples}{\mathcal{H}}
-\newcommand{\targetHostTree}{\bar{H}}
-\newcommand{\augmentedHostTreeSamples}{\mathbf{h}^{*}}
+\newcommand{\hostTreeSamples}{\mathcal{T}}
+\newcommand{\sourceHostTree}{\bar{T}}
+\newcommand{\augmentedHostTreeSamples}{\mathbf{T}^{*}}
 \newcommand{\simulationTime}{\tau}
 \newcommand{\hostEvent}{\eta}
-\newcommand{\hostEventSchedule}{\mathcal{E}}
-\newcommand{\hostEventScheduleSamples}{\mathbb{E}}
+\newcommand{\hostEventSchedule}{\mathcal{H}}
+\newcommand{\hostEventScheduleSamples}{\mathbb{H}}
 \newcommand{\symbiontTree}{\psi}
 \newcommand{\scaledSymbiontTree}{\psi\prime}
 
@@ -39,7 +39,7 @@
 \label{summary-statistics-simulation-workflow} % Note: to create an within-document reference here, use: 'See \href{\#summary-statistics-simulation-workflow}{here}'
 
 \begin{enumerate}
-    \item Generate target host tree $\targetHostTree$.
+    \item Generate source host tree $\sourceHostTree$.
     \begin{description}
         \item[Inputs]  \hfill \\
             \begin{minipage}[t]{\linewidth}
@@ -51,25 +51,25 @@
         \item[Outputs]  \hfill \\
             \begin{minipage}[t]{\linewidth}
                 \begin{compactitem}
-                    \item Time-calibrated phylogeny, $\targetHostTree$.
+                    \item Time-calibrated phylogeny, $\sourceHostTree$.
                 \end{compactitem}
             \end{minipage}
         \item[Procedure]  \hfill \\
             \begin{minipage}[t]{\linewidth}
                 \begin{compactitem}
                     \item Use \texttt{BEAST} to generate sample from the posterior distribution of trees given the data, $\hostTreeSamples$.
-                    \item Summarize $\hostTreeSamples$ using MCCT or other criteria to produce $\targetHostTree$.
+                    \item Summarize $\hostTreeSamples$ using MCCT or other criteria to produce $\sourceHostTree$.
                 \end{compactitem}
             \end{minipage}
     \end{description}
 
-    \item Generate samples of augmented host trees, $\augmentedHostTreeSamples$, conditioned on target host tree, $\targetHostTree$.
+    \item Generate samples of augmented host trees, $\augmentedHostTreeSamples$, conditioned on source host tree, $\sourceHostTree$.
     \begin{description}
         \item[Inputs]  \hfill \\
             \begin{minipage}[t]{\linewidth}
                 \begin{compactitem}
-                    \item Time-calibrated phylogeny, $\targetHostTree$.
-                    \item Labeling of tips on $\targetHostTree$ by geography (distributional range, specified as presence/absence over set of areas, for each tip).
+                    \item Time-calibrated phylogeny, $\sourceHostTree$.
+                    \item Labeling of tips on $\sourceHostTree$ by geography (distributional range, specified as presence/absence over set of areas, for each tip).
                 \end{compactitem}
             \end{minipage}
         \item[Outputs]  \hfill \\
