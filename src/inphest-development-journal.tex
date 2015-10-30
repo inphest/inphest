@@ -22,7 +22,8 @@
 \newcommand{\augmentedHostTreeSamples}{\mathbf{h}^{*}}
 \newcommand{\simulationTime}{\tau}
 \newcommand{\hostEvent}{\eta}
-\newcommand{\hostEventSchedule}{\mathbb{E}}
+\newcommand{\hostEventSchedule}{\mathcal{E}}
+\newcommand{\hostEventScheduleSamples}{\mathbb{E}}
 \newcommand{\symbiontTree}{\psi}
 \newcommand{\scaledSymbiontTree}{\psi\prime}
 
@@ -85,14 +86,29 @@
             \end{minipage}
     \end{description}
 
-    \item For \textit{each} augmented host tree, derive schedule of events, $\hostEventSchedule$, consisting of ordered pairs of $(\simulationTime, \hostEvent)$, where $\simulationTime$ is the simulation time of an event and $\hostEvent$ is the event (host speciation, host extinction, host dispersal, etc.) that occurs at that time on that particular tree.
+    \item Generate samples of schedule of host events, $\hostEventScheduleSamples$.
+    \begin{description}
+        \item[Inputs]  \hfill \\
+            \begin{minipage}[t]{\linewidth}
+                \begin{compactitem}
+                    \item Samples of host tree augmented with biogeographical history $\augmentedHostTreeSamples$.
+                \end{compactitem}
+            \end{minipage}
+        \item[Outputs]  \hfill \\
+            \begin{minipage}[t]{\linewidth}
+                \begin{compactitem}
+                    \item Samples of a schedule of host events, $\hostEventScheduleSamples$, where each distinct element $\hostEventSchedule_i, \hostEventSchedule_i \in \hostEventScheduleSamples$ bijectively corresponds to a distinct tree from $\augmentedHostTreeSamples$, and consists of a vector of ordered pairs of $(\simulationTime, \hostEvent)$, where $\simulationTime$ is the simulation time of an event and $\hostEvent$ is the event (host speciation, host extinction, host dispersal, etc.) that occurs at that time on the particular tree to which it corresponds.
+                \end{compactitem}
+            \end{minipage}
+    \end{description}
 
     \item For \textit{each} simulation replicate:
     \begin{enumerate}
-        \item Sample a schedule of events, $\hostEventSchedule$.
-        \item Simulate symbiont tree, $\symbiontTree$, conditioned on the schedule of events on host tree.
-        \item Scale symbiont tree by each substitution rate scaling factor to yield scaled symbiont tree $\scaledSymbiontTree$.
-        \item Calculate summary statistics on scaled symbiont tree, $\scaledSymbiontTree$.
+        \item Sample a schedule of host tree events, $\hostEventSchedule_i$, from $\hostEventScheduleSamples$.
+        \item Simulate symbiont tree, $\symbiontTree$, conditioned on $\hostEventSchedule$ and other parameters.
+        % \item Scale symbiont tree by each substitution rate scaling factor to yield scaled symbiont tree $\scaledSymbiontTree$.
+        % \item Calculate summary statistics on scaled symbiont tree, $\scaledSymbiontTree$.
+        \item Calculate summary statistics on the symbiont tree, $\symbiontTree$.
     \end{enumerate}
 
 \end{enumerate}
