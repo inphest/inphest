@@ -51,7 +51,7 @@
         \item[Outputs]  \hfill \\
             \begin{minipage}[t]{\linewidth}
                 \begin{compactitem}
-                    \item Time-calibrated phylogeny, $\sourceHostTree$.
+                    \item $\sourceHostTree$: time-calibrated phylogeny.
                 \end{compactitem}
             \end{minipage}
         \item[Procedure]  \hfill \\
@@ -63,19 +63,20 @@
             \end{minipage}
     \end{description}
 
-    \item Generate samples of augmented host trees, $\augmentedHostTreeSamples$, conditioned on source host tree, $\sourceHostTree$.
+    % \item Generate samples of augmented host trees, $\augmentedHostTreeSamples$, conditioned on source host tree, $\sourceHostTree$.
+    \item Generate samples of biogeographical history augmented host trees, $\augmentedHostTreeSamples$.
     \begin{description}
         \item[Inputs]  \hfill \\
             \begin{minipage}[t]{\linewidth}
                 \begin{compactitem}
-                    \item Time-calibrated phylogeny, $\sourceHostTree$.
+                    \item $\sourceHostTree$: time-calibrated phylogeny.
                     \item Labeling of tips on $\sourceHostTree$ by geography (distributional range, specified as presence/absence over set of areas, for each tip).
                 \end{compactitem}
             \end{minipage}
         \item[Outputs]  \hfill \\
             \begin{minipage}[t]{\linewidth}
                 \begin{compactitem}
-                    \item Samples of host tree augmented with biogeographical history $\augmentedHostTreeSamples$.
+                    \item $\augmentedHostTreeSamples$: samples of host tree augmented with biogeographical history.
                 \end{compactitem}
             \end{minipage}
         \item[Procedure]  \hfill \\
@@ -91,13 +92,13 @@
         \item[Inputs]  \hfill \\
             \begin{minipage}[t]{\linewidth}
                 \begin{compactitem}
-                    \item Samples of host tree augmented with biogeographical history $\augmentedHostTreeSamples$.
+                    \item $\augmentedHostTreeSamples$: samples of host tree augmented with biogeographical history.
                 \end{compactitem}
             \end{minipage}
         \item[Outputs]  \hfill \\
             \begin{minipage}[t]{\linewidth}
                 \begin{compactitem}
-                    \item Samples of a schedule of host events, $\hostEventScheduleSamples$, where each distinct element $\hostEventSchedule_i, \hostEventSchedule_i \in \hostEventScheduleSamples$ bijectively corresponds to a distinct tree from $\augmentedHostTreeSamples$, and consists of a vector of ordered pairs of $(\simulationTime, \hostEvent)$, where $\simulationTime$ is the simulation time of an event and $\hostEvent$ is the event (host speciation, host extinction, host dispersal, etc.) that occurs at that time on the particular tree to which it corresponds.
+                    \item $\hostEventScheduleSamples$: samples of a schedule of host events, where each distinct element $\hostEventSchedule_i, \hostEventSchedule_i \in \hostEventScheduleSamples$ bijectively corresponds to a distinct tree from $\augmentedHostTreeSamples$, and consists of a vector of ordered pairs of $(\simulationTime, \hostEvent)$, where $\simulationTime$ is the simulation time of an event and $\hostEvent$ is the event (host speciation, host extinction, host dispersal, etc.) that occurs at that time on the particular tree to which it corresponds.
                 \end{compactitem}
             \end{minipage}
     \end{description}
