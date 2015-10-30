@@ -13,6 +13,8 @@
 \usepackage{memhfixc}                     % remove conflict between the memoir class & hyperref
 \usepackage{graphicx}                     % Add graphics capabilities
 \usepackage{xspace}                        % smart space insertion after commands
+\usepackage{tabulary}
+\usepackage[table]{xcolor} % http://tex.stackexchange.com/questions/5363/how-to-create-alternating-rows-in-a-table
 
 %%% Notation and Variables
 \newcommand{\hostTreeSamples}{\mathcal{H}}
@@ -27,6 +29,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Main Document
 \begin{document}
+% \rowcolors{2}{gray!25}{gray!15}
 
 \title{INPHEST Development Journal}
 \maketitle
@@ -37,42 +40,54 @@
 \begin{enumerate}
     \item Generate target host tree $\targetHostTree$.
     \begin{description}
-        \item[Inputs]
-            \begin{itemize}
-                \item Sequence data.
-                \item Divergence time calibration priors.
-            \end{itemize}
-        \item[Outputs]
-            \begin{itemize}
-                \item Time-calibrated phylogeny, $\targetHostTree$.
-            \end{itemize}
-        \item[Procedure]
-            \begin{itemize}
-                \item Use \texttt{BEAST} to generate sample from the posterior distribution of trees given the data, $\hostTreeSamples$.
-                \item Summarize $\hostTreeSamples$ using MCCT or other criteria to produce $\targetHostTree$.
-            \end{itemize}
+        \item[Inputs]  \hfill \\
+            \begin{minipage}[t]{\linewidth}
+                \begin{compactitem}
+                    \item Sequence data.
+                    \item Divergence time calibration priors.
+                \end{compactitem}
+            \end{minipage}
+        \item[Outputs]  \hfill \\
+            \begin{minipage}[t]{\linewidth}
+                \begin{compactitem}
+                    \item Time-calibrated phylogeny, $\targetHostTree$.
+                \end{compactitem}
+            \end{minipage}
+        \item[Procedure]  \hfill \\
+            \begin{minipage}[t]{\linewidth}
+                \begin{compactitem}
+                    \item Use \texttt{BEAST} to generate sample from the posterior distribution of trees given the data, $\hostTreeSamples$.
+                    \item Summarize $\hostTreeSamples$ using MCCT or other criteria to produce $\targetHostTree$.
+                \end{compactitem}
+            \end{minipage}
     \end{description}
 
     \item Generate samples of augmented host trees, $\augmentedHostTreeSamples$, conditioned on target host tree, $\targetHostTree$.
     \begin{description}
-        \item[Inputs]
-            \begin{itemize}
-                \item Time-calibrated phylogeny, $\targetHostTree$.
-                \item Labeling of tips on $\targetHostTree$ by geography (distributional range, specified as presence/absence over set of areas, for each tip).
-            \end{itemize}
-        \item[Outputs]
-            \begin{itemize}
-                \item Samples of host tree augmented with biogeographical history $\augmentedHostTreeSamples$.
-            \end{itemize}
-        \item[Procedure]
-            \begin{itemize}
-                \item Use \texttt{BayArea} or \texttt{RevBayes} to generate stochastic mapped samples.
-            \end{itemize}
+        \item[Inputs]  \hfill \\
+            \begin{minipage}[t]{\linewidth}
+                \begin{compactitem}
+                    \item Time-calibrated phylogeny, $\targetHostTree$.
+                    \item Labeling of tips on $\targetHostTree$ by geography (distributional range, specified as presence/absence over set of areas, for each tip).
+                \end{compactitem}
+            \end{minipage}
+        \item[Outputs]  \hfill \\
+            \begin{minipage}[t]{\linewidth}
+                \begin{compactitem}
+                    \item Samples of host tree augmented with biogeographical history $\augmentedHostTreeSamples$.
+                \end{compactitem}
+            \end{minipage}
+        \item[Procedure]  \hfill \\
+            \begin{minipage}[t]{\linewidth}
+                \begin{compactitem}
+                    \item Use \texttt{BayArea} or \texttt{RevBayes} to generate stochastic mapped samples.
+                \end{compactitem}
+            \end{minipage}
     \end{description}
 
-\item For \textit{each} augmented host tree, derive schedule of events, $\hostEventSchedule$, consisting of ordered pairs of $(\simulationTime, \hostEvent)$, where $\simulationTime$ is the simulation time of an event and $\hostEvent$ is the event (host speciation, host extinction, host dispersal, etc.) that occurs at that time on that particular tree.
+    \item For \textit{each} augmented host tree, derive schedule of events, $\hostEventSchedule$, consisting of ordered pairs of $(\simulationTime, \hostEvent)$, where $\simulationTime$ is the simulation time of an event and $\hostEvent$ is the event (host speciation, host extinction, host dispersal, etc.) that occurs at that time on that particular tree.
 
-    \item For each simulation replicate:
+    \item For \textit{each} simulation replicate:
     \begin{enumerate}
         \item Sample a schedule of events, $\hostEventSchedule$.
         \item Simulate symbiont tree, $\symbiontTree$, conditioned on the schedule of events on host tree.
