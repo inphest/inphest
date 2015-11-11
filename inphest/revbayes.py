@@ -237,7 +237,7 @@ class RevBayesBiogeographyParser(object):
                     edge_events.append(event)
         return edge_metadata, edge_events
 
-    def store(self,
+    def serialize_tables(self,
             output_prefix,
             delimiter="\t",
             output_suffix="tsv",
@@ -283,7 +283,7 @@ class RevBayesBiogeographyParser(object):
 def main():
     rbp = RevBayesBiogeographyParser()
     rbp.parse(sys.argv[1])
-    rbp.store(sys.argv[2])
+    rbp.serialize_tables(sys.argv[2])
 
 if __name__ == "__main__":
     main()
