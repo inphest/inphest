@@ -21,7 +21,6 @@ import collections
 import re
 import dendropy
 
-
 class RevBayesBiogeographyParser(object):
 
     EVENT_PATTERN = re.compile(r"{(.*?)}")
@@ -34,11 +33,11 @@ class RevBayesBiogeographyParser(object):
             "edge_starting_age",
             "edge_ending_age",
             "edge_duration",
+            "edge_starting_state",
+            "edge_ending_state",
             "child0_edge_id",
             "child1_edge_id",
             # "edge_revbayes_index",
-            "edge_starting_state",
-            "edge_ending_state",
             "edge_cladogenetic_speciation_mode",
             )
     EVENT_SAMPLES_FIELDNAMES = (
