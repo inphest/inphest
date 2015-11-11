@@ -41,6 +41,16 @@ class RevBayesBiogeographyParser(object):
             "edge_ending_state",
             "edge_cladogenetic_speciation_mode",
             )
+    EVENT_SAMPLES_FIELDNAMES = (
+            "tree_idx",
+            "edge_id",
+            "age",
+            "event_type",
+            "event_subtype",
+            "area_idx",
+            "child0_edge_id",
+            "child1_edge_id",
+            )
     NULL_VALUE = "NA"
 
     def __init__(self):
@@ -132,14 +142,15 @@ class RevBayesBiogeographyParser(object):
                     event_entry["edge_id"] = edge_entry["edge_id"]
                     event_entry["age"] = event["age"]
                     # event_entry["time"] = event["time"]
+                    event_entry["event_type"] = "anagenesis"
                     if event["to_state"] == "1":
-                        event_entry["event_type"] = "anagenetic_area_gain"
+                        event_entry["event_subtype"] = "area_gain"
                     elif event["to_state"] == "0":
-                        event_entry["event_type"] = "anagenetic_area_loss"
+                        event_entry["event_subtype"] = "area_loss"
                     else:
                         raise ValueError("Unexpected value for state: expecting '0' or '1' but found '{}'".format(event["to_state"]))
                     event_entry["area_idx"] = event["area_idx"]
-                    event_entry["to_state"] = event["to_state"]
+                    # event_entry["to_state"] = event["to_state"]
                     self.event_schedules_by_tree.append(event_entry)
                 ## handle splitting event
                 if not nd.is_leaf():
@@ -147,6 +158,8 @@ class RevBayesBiogeographyParser(object):
                         "tree_idx": edge_entry["tree_idx"],
                         "edge_id": edge_entry["edge_id"],
                         "age": edge_entry["edge_ending_age"],
+                        "event_type": "cladogenesis",
+                        "event_subtype": edge_entry["edge_cladogenetic_speciation_mode"],
                         "child0_edge_id": edge_entry["child0_edge_id"],
                         "child1_edge_id": edge_entry["child1_edge_id"],
                             })
@@ -243,7 +256,7 @@ class RevBayesBiogeographyParser(object):
 
         # edge samples
         # events_by_treef = open(output_prefix + ".tree-events." + output_suffix, "w")
-        edgef = open(output_prefix + ".edges." + output_suffix, "w")
+        edgef = open(output_prefix + ".edge-samples." + output_suffix, "w")
         writer = csv.DictWriter(edgef,
                 fieldnames=RevBayesBiogeographyParser.EDGE_SAMPLES_FIELDNAMES,
                 restval=RevBayesBiogeographyParser.NULL_VALUE,
@@ -253,6 +266,18 @@ class RevBayesBiogeographyParser(object):
         writer.writeheader()
         writer.writerows(self.edge_entries)
         edgef.close()
+
+        # event samples
+        events_by_treef = open(output_prefix + ".event-samples." + output_suffix, "w")
+        writer = csv.DictWriter(events_by_treef,
+                fieldnames=RevBayesBiogeographyParser.EVENT_SAMPLES_FIELDNAMES,
+                restval=RevBayesBiogeographyParser.NULL_VALUE,
+                delimiter=delimiter,
+                lineterminator=os.linesep,
+                )
+        writer.writeheader()
+        writer.writerows(self.event_schedules_by_tree)
+        events_by_treef.close()
 
 
 def main():
