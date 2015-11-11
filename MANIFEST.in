@@ -1,0 +1,11 @@
+include README.md
+include CHANGES.md
+include LICENSE.txt
+# include doc/Makefile
+# recursive-include doc/source *
+global-exclude .DS_Store
+global-exclude *.pyc
+global-exclude .gitignore
+global-exclude .gitattributes
+global-exclude .idea
+global-exclude __pycache__
