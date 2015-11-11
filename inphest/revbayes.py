@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+# -*- coding: utf-8 -*-
 
 ##############################################################################
 ##
@@ -89,12 +90,54 @@ class RevBayesBiogeographyParser(object):
                     for ch_idx, ch in enumerate(nd.child_node_iter()):
                         edge_master_entry["child{}".format(ch_idx)] = int(ch.edge.bipartition)
                 edge_metadata, edge_events = self._extract_comment_metadata(nd)
-                # edge_master_entry["revbayes_index"] = nd.annotations.get_value("index")
-                # edge_master_entry["starting_state"] = nd.annotations.get_value("pa")
-                # edge_master_entry["ending_state"] = nd.annotations.get_value("nd")
+                edge_master_entry["revbayes_index"] = edge_metadata["index"]
+                edge_master_entry["starting_state"] = edge_metadata["pa"]
+                edge_master_entry["ending_state"] = edge_metadata["nd"]
+                if "cs" in edge_metadata:
+                    if edge_metadata["cs"] == "s":
+                        edge_master_entry["cladogenetic_speciation_mode"] = "subset_sympatry"
+                    elif edge_metadata["cs"] == "n":
+                        edge_master_entry["cladogenetic_speciation_mode"] = "narrow_sympatry"
+                    elif edge_metadata["cs"] == "w":
+                        edge_master_entry["cladogenetic_speciation_mode"] = "widespread_sympatry"
+                    elif edge_metadata["cs"] == "a":
+                        edge_master_entry["cladogenetic_speciation_mode"] = "allopatry"
+                    else:
+                        raise ValueError("Unrecognized cladogenetic speciation mode event type: '{}'".format(edge_metadata["cs"]))
+                else:
+                    edge_master_entry["cladogenetic_speciation_mode"] = "NA"
 
     def _extract_comment_metadata(self, nd):
+
+        #
+        # Michael Landis, pers. comm., 2015-11-09:
+        #
+        #    Galago_senegalensis[&index=22;nd=0000000000000111000000000;pa=0100000000000101000000000;ev={{t:0.393107,a:10.3104,s:1,i:14},{t:0.70063,a:5.08596,s:0,i:1}}]:16.9889
+        #
+        #    which says the branch has index 22,
+        #    it ends with state 0000000000000111000000000,
+        #    it begins with state 0100000000000101000000000,
+        #    with two intermediate events:
+        #    area 14 transitions to state 1 at age 10.3104
+        #    area 1 transitions to state 0 at age 5.08496
+        #
+        #    Basically, I take all these node metadata for all MCMC outputs and compile them into that dictionary in bg_parse. bg_parse.py has extremely poor documentation and might not see further development. I can dig into it more later, but here is an explanation from memory. In any case, if you are curious about these keys for a given node:
+        #
+        #    ['ch1', 'iteration', 'bn', 'nd', 'ch0', 'prior', 'posterior', 'pa', 'cs', 'ev', ' likelihood']
+        #
+        #    'bn' is the branch node index, I think...
+        #    'nd' gives the node state preceding speciation
+        #    'ch0','ch1' gives the daughter node states following speciation (left and right nodes)
+        #    'cs' gives the cladogenic event type
+        #    'pa' gives the ancestral state at the base of the branch
+        #    'ev' gives an event vector of transition events
+        #    'iteration', 'prior', 'posterior', 'likelihood' just report MCMC values
+        #
+
         comment_str = ";".join(nd.comments)
+        assert comment_str[0] == "&"
+        comment_str = comment_str[1:]
+
         metadata_items_as_str = comment_str.split(";")
         edge_metadata = {}
         events_str = None
