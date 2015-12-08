@@ -36,7 +36,6 @@
 \maketitle
 
 \section{Simulation of Summary Statistics}
-\label{summary-statistics-simulation-workflow} % Note: to create an within-document reference here, use: 'See \href{\#summary-statistics-simulation-workflow}{here}'
 
 \begin{enumerate}
     \item Generate source host tree $\sourceHostTree$.
@@ -113,5 +112,73 @@
     \end{enumerate}
 
 \end{enumerate}
+
+\section{Event Dynamics}
+\begin{description}
+    \item[Host lineage speciation]  \hfill \\
+        \begin{minipage}[t]{\linewidth}
+            \begin{compactitem}
+                \item Daughter host lineages inherit parent symbiont load:
+                    \begin{compactitem}
+                        \item Both host daughters inherit full symbiont load of parent?
+                        \item Some other scheme?
+                    \end{compactitem}
+            \end{compactitem}
+        \end{minipage}
+    \item[Host lineage extinction]  \hfill \\
+        \begin{minipage}[t]{\linewidth}
+            \begin{compactitem}
+                \item Symbiont lineages loses host. If this results in any symbiont lineage host set being reduced to the null set, the symbiont lineage goes extinct.
+            \end{compactitem}
+        \end{minipage}
+    \item[Host lineage area gain]  \hfill \\
+        \begin{minipage}[t]{\linewidth}
+            \begin{compactitem}
+            \item No action (passive area gain by proxy by symbiont lineages associated with this host).
+            \end{compactitem}
+        \end{minipage}
+    \item[Host lineage area loss]  \hfill \\
+        \begin{minipage}[t]{\linewidth}
+            \begin{compactitem}
+            \item If host lineage does not go extinct (host lineage range not reduced to the null set): no action (passive area loss by proxy by symbiont lineages associated with this host).
+            \item If host lineage goes extinct (host lineage range reduced to the null set): as with host lineage extinction (above).
+            \end{compactitem}
+        \end{minipage}
+    \item[Symbiont lineage speciation]  \hfill \\
+        \begin{minipage}[t]{\linewidth}
+            \begin{compactitem}
+                \item Daughter symbiont lineages inherit parent host set pseudo-allopatrically: one daughter lineage inherits one host, other inherit remaining.
+                \item Daughter symbiont lineages inherit parent host set pseudo-subset-sympatrically: one daughter lineage inherits one host, other inherits entire host set.
+                \item Daughter symbiont lineages inherit parent host set by random sampling with replacement.
+                \item Daughter symbiont lineages partition parent host set (randomly).
+            \end{compactitem}
+        \end{minipage}
+    \item[Symbiont lineage extinction]  \hfill \\
+        \begin{minipage}[t]{\linewidth}
+            \begin{compactitem}
+                \item Symbiont lineage removed from tree.
+            \end{compactitem}
+        \end{minipage}
+    \item[Symbiont lineage host gain]  \hfill \\
+        \begin{minipage}[t]{\linewidth}
+            \begin{compactitem}
+                \item Symbiont lineage gains host.
+                \item Note: potential (new) hosts restricted to hosts that share one or more biogeographical areas with a current host.
+            \end{compactitem}
+        \end{minipage}
+    \item[Symbiont lineage host loss]  \hfill \\
+        \begin{minipage}[t]{\linewidth}
+            \begin{compactitem}
+                \item Symbiont lineage loses host, going extinct if host set reduced to the null set.
+            \end{compactitem}
+        \end{minipage}
+    \item[Symbiont lineage host jumping]  \hfill \\
+        \begin{minipage}[t]{\linewidth}
+            \begin{compactitem}
+                \item Symbiont lineage gains host.
+                \item Note: potential (new) hosts restricted to hosts that share one or more biogeographical areas with a current host.
+            \end{compactitem}
+        \end{minipage}
+\end{description}
 
 \end{document}
