@@ -122,6 +122,32 @@ class StatesVector(object):
     def __repr__(self):
         return str(self._states)
 
+class DistributionVector(StatesVector):
+
+    @classmethod
+    def from_string(cls, s):
+        num_areas = len(s)
+        values = [int(i) for i in s]
+        return cls(num_areas=num_areas, values=values)
+
+    def __init__(self, num_areas, values=None):
+        StatesVector.__init__(self,
+                nchar=num_areas,
+                nstates=[2] * num_areas,
+                values=values,
+                )
+
+    def presences(self):
+        """
+        Returns list of indexes in which lineage is present.
+        """
+        return [idx for idx, s in enumerate(self._states) if s == 1]
+
+    def clone(self):
+        s = self.__class__(num_areas=self._nchar)
+        s._states = list(self._states)
+        return s
+
 class HostRegime(object):
 
     """
@@ -129,13 +155,15 @@ class HostRegime(object):
     """
 
     HostLineage = collections.namedtuple("HostLineage", [
+        "tree_idx",                 #   identifer of tree from which this lineage has been sampled (same lineage, as given by split id will occur on different trees/histories)
         "lineage_id",               #   lineage (edge/split) id on which event occurs
-        "lineage_start_geography",  #   distribution/range (area set) at beginning of lineage
-        "lineage_end_geography",    #   distribution/range (area set) at end of lineage
+        "lineage_start_distribution",  #   distribution/range (area set) at beginning of lineage
+        "lineage_end_distribution",    #   distribution/range (area set) at end of lineage
     ])
 
     HostEvent = collections.namedtuple("HostEvent", [
         "time",                     #   time of event
+        "tree_idx",                 #   identifer of tree from which this event has been sampled
         "probability",              #   probability of event (1.0 if we take history as truth)
         "lineage_id",               #   lineage (edge/split) id on which event occurs
         "event_type",               #   type of event: anagenesis, cladogenesis
@@ -147,8 +175,10 @@ class HostRegime(object):
 
     def __init__(self):
         self.taxon_namespace = dendropy.TaxonNamespace()
-        self.host_events = []
         self.next_host_event_index = 0
+        self.host_events = [] # collection of HostEvent objects, sorted by time
+        self.tree_probabilities = []  # collection of probabilities associated with each tree index
+        self.host_lineages = {} # keys: (tree_idx, lineage_id); values: HostLineage
 
     def parse_host_biogeography(self, src):
         """
@@ -156,6 +186,17 @@ class HostRegime(object):
         """
         rb = revbayes.RevBayesBiogeographyParser(taxon_namespace=self.taxon_namespace)
         rb.parse(src)
+
+        for tree_entry in rb.tree_entries:
+            self.tree_probabilities.append(tree_entry["posterior"])
+
+        for edge_entry in rb.edge_entries:
+            self.host_lineages[ (edge_entry["tree_idx"], edge_entry["split_bitstring"] ) ] = HostRegime.HostLineage(
+                    tree_idx=edge_entry["tree_idx"],
+                    lineage_id=edge_entry["split_bitstring"],
+                    lineage_start_distribution=DistributionVector.from_string(edge_entry["edge_starting_state"]),
+                    lineage_end_distribution=DistributionVector.from_string(edge_entry["edge_ending_state"]),
+                    )
 
 
 if __name__ == "__main__":
