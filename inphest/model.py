@@ -187,8 +187,11 @@ class HostRegime(object):
         rb = revbayes.RevBayesBiogeographyParser(taxon_namespace=self.taxon_namespace)
         rb.parse(src)
 
+        total_tree_ln_likelihoods = 0.0
         for tree_entry in rb.tree_entries:
-            self.tree_probabilities.append(tree_entry["posterior"])
+            total_tree_ln_likelihoods += tree_entry["posterior"]
+        for tree_entry in rb.tree_entries:
+            self.tree_probabilities.append(tree_entry["posterior"]/total_tree_ln_likelihoods)
 
         for edge_entry in rb.edge_entries:
             self.host_lineages[ (edge_entry["tree_idx"], edge_entry["split_bitstring"] ) ] = HostRegime.HostLineage(
@@ -210,8 +213,8 @@ class HostRegime(object):
                 child0_lineage_id=event_entry.get("child0_edge_id", None),
                 child1_lineage_id=event_entry.get("child1_edge_id", None),
                 ))
+        self.host_events.sort(key=lambda x: x.event_time)
         print(self.host_events)
-
 
 if __name__ == "__main__":
     h = HostRegime()
