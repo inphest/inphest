@@ -22,6 +22,8 @@ import json
 _LOGGING_LEVEL_ENVAR = "INPHEST_LOGGING_LEVEL"
 _LOGGING_FORMAT_ENVAR = "INPHEST_LOGGING_FORMAT"
 
+TEST_DATA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, "test", "data")
+
 def open_output_file_for_csv_writer(filepath, append=False):
     if filepath is None or filepath == "-":
         out = sys.stdout

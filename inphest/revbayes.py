@@ -52,7 +52,7 @@ class RevBayesBiogeographyParser(object):
             )
     NULL_VALUE = "NA"
 
-    def __init__(self):
+    def __init__(self, taxon_namespace=None):
         ## information on each tree in sample
         self.tree_entries = []
         ## events organized by tree
@@ -61,13 +61,17 @@ class RevBayesBiogeographyParser(object):
         self.edge_entries = []
         ## events organized by bipartition
         self.event_schedules_by_edge = collections.defaultdict(dendropy.Bipartition)
+        ### taxon management
+        if taxon_namespace is None:
+            self.taxon_namespace = dendropy.TaxonNamespace()
+        else:
+            self.taxon_namespace = taxon_namespace
 
     def parse(self, src, skip_first_row=True):
         if isinstance(src, str):
             src = open(src)
         if skip_first_row:
             next(src) # skip over header
-        taxon_namespace = dendropy.TaxonNamespace()
         tree_idx = -1
         for row_idx, row in enumerate(src):
             row = row.strip("\n")
@@ -89,7 +93,7 @@ class RevBayesBiogeographyParser(object):
             tree = dendropy.Tree.get(
                     data=tree_str,
                     schema="newick",
-                    taxon_namespace=taxon_namespace,
+                    taxon_namespace=self.taxon_namespace,
                     terminating_semicolon_required=False,
                     rooting="force-rooted",
                     extract_comment_metadata=False,
