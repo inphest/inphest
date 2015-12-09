@@ -162,9 +162,9 @@ class HostRegime(object):
     ])
 
     HostEvent = collections.namedtuple("HostEvent", [
-        "time",                     #   time of event
-        "tree_idx",                 #   identifer of tree from which this event has been sampled
+        "event_time",               #   time of event
         "probability",              #   probability of event (1.0 if we take history as truth)
+        "tree_idx",                 #   identifer of tree from which this event has been sampled
         "lineage_id",               #   lineage (edge/split) id on which event occurs
         "event_type",               #   type of event: anagenesis, cladogenesis
         "event_subtype",            #   if anagenesis: area_loss, area_gain; if cladogenesis: narrow sympatry etc.
@@ -193,10 +193,24 @@ class HostRegime(object):
         for edge_entry in rb.edge_entries:
             self.host_lineages[ (edge_entry["tree_idx"], edge_entry["split_bitstring"] ) ] = HostRegime.HostLineage(
                     tree_idx=edge_entry["tree_idx"],
-                    lineage_id=edge_entry["split_bitstring"],
+                    lineage_id=edge_entry["edge_id"],
                     lineage_start_distribution=DistributionVector.from_string(edge_entry["edge_starting_state"]),
                     lineage_end_distribution=DistributionVector.from_string(edge_entry["edge_ending_state"]),
                     )
+
+        for event_entry in rb.event_schedules_by_tree:
+            self.host_events.append(HostRegime.HostEvent(
+                event_time=event_entry["age"],
+                probability=self.tree_probabilities[event_entry["tree_idx"]],
+                tree_idx=event_entry["tree_idx"],
+                lineage_id=event_entry["edge_id"],
+                event_type=event_entry["event_type"],
+                event_subtype=event_entry["event_subtype"],
+                area_idx=event_entry.get("area_idx", None),
+                child0_lineage_id=event_entry.get("child0_edge_id", None),
+                child1_lineage_id=event_entry.get("child1_edge_id", None),
+                ))
+        print(self.host_events)
 
 
 if __name__ == "__main__":
