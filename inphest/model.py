@@ -155,16 +155,16 @@ class HostRegime(object):
     """
 
     HostLineage = collections.namedtuple("HostLineage", [
-        "tree_idx",                 #   identifer of tree from which this lineage has been sampled (same lineage, as given by split id will occur on different trees/histories)
+        # "tree_idx",                 #   identifer of tree from which this lineage has been sampled (same lineage, as given by split id will occur on different trees/histories)
         "lineage_id",               #   lineage (edge/split) id on which event occurs
         "lineage_start_distribution",  #   distribution/range (area set) at beginning of lineage
         "lineage_end_distribution",    #   distribution/range (area set) at end of lineage
     ])
 
     HostEvent = collections.namedtuple("HostEvent", [
+        # "tree_idx",                 #   identifer of tree from which this event has been sampled
         "event_time",               #   time of event
-        "probability",              #   probability of event (1.0 if we take history as truth)
-        "tree_idx",                 #   identifer of tree from which this event has been sampled
+        "weight",                   #   probability of event (1.0 if we take history as truth)
         "lineage_id",               #   lineage (edge/split) id on which event occurs
         "event_type",               #   type of event: anagenesis, cladogenesis
         "event_subtype",            #   if anagenesis: area_loss, area_gain; if cladogenesis: narrow sympatry etc.
@@ -173,12 +173,24 @@ class HostRegime(object):
         "child1_lineage_id",        #   split/edge id of second daughter (cladogenesis)
         ])
 
+    def __init__(self, taxon_namespace=None):
+        if taxon_namespace is None:
+            self.taxon_namespace = dendropy.TaxonNamespace()
+        else:
+            self.taxon_namespace = taxon_namespace
+        self.next_event_index = 0
+        self.events = [] # collection of HostEvent objects, sorted by time
+        self.lineages = {} # keys: lineage_id (== int(Bipartition) == Bipartition.bitmask); values: HostLineage
+
+    def compile(self):
+        self.events.sort(key=lambda x: x.event_time)
+        print(self.events)
+
+class HostRegimeSamples(object):
+
     def __init__(self):
+        self.host_regimes = []
         self.taxon_namespace = dendropy.TaxonNamespace()
-        self.next_host_event_index = 0
-        self.host_events = [] # collection of HostEvent objects, sorted by time
-        self.tree_probabilities = []  # collection of probabilities associated with each tree index
-        self.host_lineages = {} # keys: (tree_idx, lineage_id); values: HostLineage
 
     def parse_host_biogeography(self, src):
         """
@@ -187,37 +199,52 @@ class HostRegime(object):
         rb = revbayes.RevBayesBiogeographyParser(taxon_namespace=self.taxon_namespace)
         rb.parse(src)
 
-        total_tree_ln_likelihoods = 0.0
-        for tree_entry in rb.tree_entries:
-            total_tree_ln_likelihoods += tree_entry["posterior"]
-        for tree_entry in rb.tree_entries:
-            self.tree_probabilities.append(tree_entry["posterior"]/total_tree_ln_likelihoods)
+        # total_tree_ln_likelihoods = 0.0
+        # for tree_entry in rb.tree_entries:
+        #     total_tree_ln_likelihoods += tree_entry["posterior"]
+        # for tree_entry in rb.tree_entries:
+        #     self.tree_probabilities.append(tree_entry["posterior"]/total_tree_ln_likelihoods)
+
+        tree_host_regimes = {}
 
         for edge_entry in rb.edge_entries:
-            self.host_lineages[ (edge_entry["tree_idx"], edge_entry["split_bitstring"] ) ] = HostRegime.HostLineage(
-                    tree_idx=edge_entry["tree_idx"],
-                    lineage_id=edge_entry["edge_id"],
+            tree_idx = edge_entry["tree_idx"]
+            if tree_idx not in tree_host_regimes:
+                tree_host_regimes[tree_idx] = HostRegime(taxon_namespace=self.taxon_namespace)
+            lineage_id = edge_entry["edge_id"]
+            lineage = HostRegime.HostLineage(
+                    # tree_idx=edge_entry["tree_idx"],
+                    lineage_id=lineage_id,
                     lineage_start_distribution=DistributionVector.from_string(edge_entry["edge_starting_state"]),
                     lineage_end_distribution=DistributionVector.from_string(edge_entry["edge_ending_state"]),
                     )
+            assert lineage.lineage_id not in tree_host_regimes[tree_idx].lineages
+            tree_host_regimes[tree_idx].lineages[lineage_id] = lineage
 
         for event_entry in rb.event_schedules_by_tree:
-            self.host_events.append(HostRegime.HostEvent(
+            tree_idx = event_entry["tree_idx"]
+            if tree_idx not in tree_host_regimes:
+                tree_host_regimes[tree_idx] = HostRegime(taxon_namespace=self.taxon_namespace)
+            event = HostRegime.HostEvent(
+                # tree_idx=event_entry["tree_idx"],
                 event_time=event_entry["age"],
-                probability=self.tree_probabilities[event_entry["tree_idx"]],
-                tree_idx=event_entry["tree_idx"],
+                # weight=self.tree_probabilities[event_entry["tree_idx"]],
+                weight=1.0,
                 lineage_id=event_entry["edge_id"],
                 event_type=event_entry["event_type"],
                 event_subtype=event_entry["event_subtype"],
                 area_idx=event_entry.get("area_idx", None),
                 child0_lineage_id=event_entry.get("child0_edge_id", None),
                 child1_lineage_id=event_entry.get("child1_edge_id", None),
-                ))
-        self.host_events.sort(key=lambda x: x.event_time)
-        print(self.host_events)
+                )
+            assert event.lineage_id in tree_host_regimes[tree_idx].lineages
+            tree_host_regimes[tree_idx].events.append(event)
+        for host_regime in tree_host_regimes.values():
+            host_regime.compile()
+            self.host_regimes.append(host_regime)
 
 if __name__ == "__main__":
-    h = HostRegime()
+    hh = HostRegimeSamples()
     rb_data = os.path.join(utility.TEST_DATA_PATH, "revbayes", "bg_large.events.txt")
     rb_data_src = open(rb_data, "r")
-    h.parse_host_biogeography(rb_data_src)
+    hh.parse_host_biogeography(rb_data_src)
