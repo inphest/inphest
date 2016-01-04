@@ -266,16 +266,91 @@ class HostSystem(object):
 
     def compile(self, host_regime):
         self.host_regime = host_regime
-        self.host_lineages = {}
+        self.host_lineages_by_id = {}
         num_areas = None
         for host_regime_lineage_id in self.host_regime.lineages.values():
             host = HostSystem.Host(host_regime_lineage_id_definition)
-            self.host_lineages[host.lineage_id] = host
+            self.host_lineages_by_id[host.lineage_id] = host
             if num_areas is None:
                 num_areas = len(host.start_distribution)
             assert num_areas == len(host.start_distribution)
             assert num_areas == len(host.end_distribution)
         self.num_areas = num_areas
+
+class DistributionMatrix(object):
+    """
+    Manages the area-by-host distribution of a single symbiont lineage.
+    """
+
+    def __init__(self,
+            symbiont_lineage,
+            host_system):
+        self.symbiont_lineage = symbiont_lineage
+        self.host_system = host_system
+
+        ## distribution set: tuples of (host_lineage_id, area_idx)
+        # self._host_area_distribution = set()
+
+        ## distribution matrix: [host_lineage_id][area_idx]
+        self._distribution_matrix = {}
+        for host_lineage_id in self.host_system.host_lineages_by_id:
+            self._distribution_matrix[host_lineage_id] = []
+            for area_idx in range(self.host_system.num_areas):
+                self._distribution_matrix[host_lineage_id].append(0)
+
+        ## For quick look-up if present in an area
+        ## Maintained as a count of hosts in which the parasite occurs in a particular area
+        self._area_idx_occurences = [0 for idx in range(self.host_system.num_areas)]
+
+        ## For quick look-up if host is infected
+        self._infected_hosts = set()
+
+    def add_host(self, host_lineage_id, area_idx=None):
+        """
+        Adds a host to the distribution.
+        If ``area_idx`` is specified, then only the host in a specific area is infected.
+        Otherwise, all hosts (of the given lineage) in all areas are infected.
+        """
+        if area_idx is None:
+            for area_idx in range(self._distribution_matrix[host_lineage_id]):
+                self._distribution_matrix[host_lineage_id][area_idx] = 1
+                self._area_idx_occurences[area_idx] += 1
+        else:
+            self._distribution_matrix[host_lineage_id][area_idx] = 1
+            self._area_idx_occurences[area_idx] += 1
+        self._infected_hosts.add(host_lineage_id)
+
+    def remove_host(self, host_lineage_id, area_idx=None):
+        """
+        Removes a host from the distribution.
+        If ``area_idx`` is specified, then only the host in that specific area is removed. Otherwise,
+        Otherwise, all hosts (of the given lineage) of all areas are removed from the range.
+        """
+        if area_idx is None:
+            for area_idx in range(self._distribution_matrix[host_lineage_id]):
+                self._distribution_matrix[host_lineage_id][area_idx] = 0
+                self._area_idx_occurences[area_idx] -= 1
+        else:
+            self._distribution_matrix[host_lineage_id][area_idx] = 1
+            self._area_idx_occurences[area_idx] -= 1
+        self._infected_hosts.remove(host_lineage_id)
+
+    def has_host(self, host_lineage_id, area_idx=None):
+        """
+        Returns True if host is infected with this parasite, False otherwise.
+        If ``area_idx`` is specified then only the host in that area is checked.
+        Otherwise, if the host is infected in *any* of its areas, returns True.
+        """
+        if area_idx is None:
+            return host_lineage_id in self._infected_hosts
+        else:
+            return self._distribution_matrix[host_lineage_id][area_idx] == 1
+
+    def has_area(self, area_idx):
+        """
+        Returns True if parasite occurs in area, False otherwise.
+        """
+        return self._area_idx_occurences[area_idx] == 1
 
 class Lineage(dendropy.Node):
 
