@@ -350,7 +350,7 @@ class DistributionMatrix(object):
         """
         Returns True if parasite occurs in area, False otherwise.
         """
-        return self._area_idx_occurences[area_idx] == 1
+        return self._area_idx_occurences[area_idx] > 0
 
 class Lineage(dendropy.Node):
 
