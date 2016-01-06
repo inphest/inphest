@@ -183,7 +183,7 @@ class HostRegime(object):
 
     def compile(self):
         self.events.sort(key=lambda x: x.event_time)
-        print(self.events)
+        # print(self.events)
 
 class HostRegimeSamples(object):
     """
@@ -277,9 +277,9 @@ class HostSystem(object):
             assert num_areas == len(host.end_distribution)
         self.num_areas = num_areas
 
-class DistributionMatrix(object):
+class SymbiontHostAreaDistributionMatrix(object):
     """
-    Manages the area-by-host distribution of a single symbiont lineage.
+    Manages the host-by-area distribution of a single symbiont lineage.
     """
 
     def __init__(self,
@@ -356,13 +356,11 @@ class Lineage(dendropy.Node):
 
     def __init__(self,
             index,
-            distribution_vector=None,
-            traits_vector=None,
+            distribution_matrix=None,
             ):
         dendropy.Node.__init__(self)
+        self.distribution_matrix = distribution_matrix
         self.index = index
-        self.distribution_vector = distribution_vector
-        self.traits_vector = traits_vector
         self.is_extant = True
         self.edge.length = 0
 
@@ -384,12 +382,8 @@ class Phylogeny(dendropy.Tree):
             if "seed_node" not in kwargs:
                 seed_node = self.node_factory(
                         index=next(self.lineage_indexer),
-                        distribution_vector=self.model.geography.new_distribution_vector(),
-                        traits_vector=self.model.trait_types.new_traits_vector(),
+                        distribution_matrix=self.model.geography.new_distribution_vector(),
                         )
-                for trait_idx in range(len(self.model.trait_types)):
-                    trait_states = [i for i in range(self.model.trait_types[trait_idx].nstates)]
-                    seed_node.traits_vector[trait_idx] = self.rng.choice(trait_states)
                 initial_area = self.rng.randint(0, len(seed_node.distribution_vector)-1)
                 seed_node.distribution_vector[initial_area] = 1
                 kwargs["seed_node"] = seed_node
@@ -588,6 +582,413 @@ class Phylogeny(dendropy.Tree):
             raise error.InsufficientFocalAreaLineagesSimulationException("no extant lineages in focal area at termination".format(len(focal_area_lineages)))
         return tcopy
 
+class InphestModel(object):
+
+    _TRAITS_SEPARATOR = "."
+    _LABEL_COMPONENTS_SEPARATOR = "^"
+    _NULL_TRAITS = "NA"
+
+    @classmethod
+    def create(
+            cls,
+            host_regime,
+            model_definition_source,
+            model_definition_type,
+            interpolate_missing_model_values=False,
+            run_logger=None,
+            ):
+        """
+        Create and return a model under which to run a simulation.
+
+        Parameters
+        ----------
+        model_definition_source : object
+            See 'model_definition_type' argument for values this can take.
+        model_definition_type : str
+            Whether 'model_definition_source' is:
+
+                - 'python-dict' : a Python dictionary defining the model.
+                - 'python-dict-str' : a string providing a Python dictionary
+                  defining the model.
+                - 'python-dict-filepath' : a path to a Python file to be evaluated;
+                  the file should be a valid Python script containing nothing but a
+                  dictionary defining the model.
+                - 'json-filepath': a path to a JSON file containing a dictionary
+                  defining the model.
+
+        Returns
+        -------
+        m : ArchipelagoModel
+            A fully-specified Archipelago model.
+
+        Example
+        -------
+
+            hrs = HostRegimeSamples()
+            rb_data = os.path.join(utility.TEST_DATA_PATH, "revbayes", "bg_large.events.txt")
+            rb_data_src = open(rb_data, "r")
+            hrs.parse_host_biogeography(rb_data_src)
+            for host_regime in hrs.host_regimes:
+                im = InphestModel.create(
+                        host_regime=host_regime,
+                        model_definition_source="model1.json",
+                        model_definition_type="json",
+                        )
+
+        """
+        if model_definition_type == "python-dict-filepath":
+            src = open(model_definition_source, "r")
+            model_definition = eval(src.read())
+        elif model_definition_type == "python-dict-str":
+            model_definition = eval(model_definition_source)
+        elif model_definition_type == "python-dict":
+            model_definition = model_definition_source
+        elif model_definition_type == "json-filepath":
+            src = open(model_definition_source, "r")
+            model_definition = json.load(src)
+        else:
+            raise ValueError("Unrecognized model definition type: '{}'".format(model_definition_type))
+        return cls.from_definition_dict(
+                host_regime=host_regime,
+                model_definition=model_definition,
+                run_logger=run_logger,
+                interpolate_missing_model_values=interpolate_missing_model_values)
+
+    @classmethod
+    def from_definition_dict(cls,
+            host_regime,
+            model_definition,
+            interpolate_missing_model_values=False,
+            run_logger=None):
+        archipelago_model = cls(host_regime=host_regime)
+        archipelago_model.parse_definition(
+                model_definition=model_definition,
+                interpolate_missing_model_values=interpolate_missing_model_values,
+                run_logger=run_logger,
+        )
+        return archipelago_model
+
+    @staticmethod
+    def compose_encoded_label(
+            lineage,
+            excluded_area_indexes=None):
+        raise NotImplementedError
+        # if lineage.traits_vector:
+        #     traits_v = ArchipelagoModel._TRAITS_SEPARATOR.join(str(i) for i in lineage.traits_vector)
+        # else:
+        #     traits_v = ArchipelagoModel._NULL_TRAITS
+        # if excluded_area_indexes is None:
+        #     areas_v = "".join(str(i) for i in lineage.distribution_vector)
+        # else:
+        #     areas_v = "".join(str(i) for idx, i in enumerate(lineage.distribution_vector) if idx not in excluded_area_indexes)
+        # encoding = "s{lineage_index}{sep}{traits_v}{sep}{areas_v}".format(
+        #         lineage_index=lineage.index,
+        #         traits_v=traits_v,
+        #         areas_v=areas_v,
+        #         sep=ArchipelagoModel._LABEL_COMPONENTS_SEPARATOR)
+        # return encoding
+
+    @staticmethod
+    def decode_label(label):
+        raise NotImplementedError
+        # parts = label.split(ArchipelagoModel._LABEL_COMPONENTS_SEPARATOR)
+        # traits_string = parts[1]
+        # if not traits_string or traits_string == ArchipelagoModel._NULL_TRAITS:
+        #     traits_vector = StatesVector(nchar=0)
+        # else:
+        #     traits_string_parts = traits_string.split(ArchipelagoModel._TRAITS_SEPARATOR)
+        #     traits_vector = StatesVector(
+        #             nchar=len(traits_string_parts),
+        #             # The trait states need to be an integer if
+        #             # archipelago-summarize.py coerces the user input to
+        #             # integers
+        #             # values=[int(i) for i in traits_string_parts],
+        #             # The reason we do NOT want it parsed to an integer value
+        #             # is to allow null traits 'NA', 'null', etc.
+        #             values=[i for i in traits_string_parts],
+        #             )
+        # distribution_string = parts[2]
+        # distribution_vector = DistributionVector(
+        #         num_areas=len(distribution_string),
+        #         values=[int(i) for i in distribution_string],)
+        # return traits_vector, distribution_vector
+
+    @staticmethod
+    def set_lineage_data(
+            tree,
+            leaf_nodes_only=False,
+            lineage_data_source="node",
+            traits_filepath=None,
+            areas_filepath=None,
+            ):
+        raise NotImplementedError
+        # if lineage_data_source == "node":
+        #     _decode = lambda x: ArchipelagoModel.decode_label(x.label)
+        # elif lineage_data_source == "taxon":
+        #     _decode = lambda x: ArchipelagoModel.decode_label(x.taxon.label)
+        # else:
+        #     raise ValueError("'lineage_data_source' must be 'node' or 'taxon'")
+        # for nd in tree:
+        #     if (not leaf_nodes_only or not nd._child_nodes) and (lineage_data_source == "node" or nd.taxon is not None):
+        #         traits_vector, distribution_vector = _decode(nd)
+        #         nd.traits_vector = traits_vector
+        #         nd.distribution_vector = distribution_vector
+        #     else:
+        #         nd.traits_vector = None
+        #         nd.distribution_vector = None
+
+    def __init__(self, host_regime):
+        self.host_regime = host_regime
+
+    def parse_definition(self,
+            model_definition,
+            run_logger=None,
+            interpolate_missing_model_values=True):
+
+        # initialize
+        if model_definition is None:
+            model_definition = {}
+        else:
+            model_definition = dict(model_definition)
+
+        # mode identification
+        if "model_id" not in model_definition:
+            model_definition["model_id"] = "Model1"
+            if run_logger is not None:
+                run_logger.warning("Model identifier not specified: defaulting to '{}'".format(model_definition["model_id"]))
+        self.model_id = model_definition.pop("model_id", "Model1")
+        if run_logger is not None:
+            run_logger.info("Setting up model with identifier: '{}'".format(self.model_id))
+
+        # Geography
+        if "areas" not in model_definition:
+            if interpolate_missing_model_values:
+                model_definition["areas"] = [
+                        {'is_supplemental': False, 'label': 'a1'},
+                        {'is_supplemental': False, 'label': 'a2'},
+                        {'is_supplemental': False, 'label': 'a3'},
+                        {'is_supplemental': False, 'label': 'a4'},
+                        {'is_supplemental': True, 'label': 's1'}
+                ]
+            else:
+                raise ValueError("No areas defined")
+        self.geography = Geography()
+        self.geography.parse_definition(
+                copy.deepcopy(model_definition.pop("areas", [])),
+                run_logger=run_logger)
+
+        # Ecology
+        self.trait_types = TraitTypes()
+        self.trait_types.parse_definition(
+                copy.deepcopy(model_definition.pop("traits", [])),
+                run_logger=run_logger)
+
+        # Diversification
+        ## speciation
+        diversification_d = dict(model_definition.pop("diversification", {}))
+        if "lineage_birth_rate" in diversification_d:
+            self.lineage_birth_rate_function = RateFunction.from_definition_dict(diversification_d.pop("lineage_birth_rate"), self.trait_types)
+        else:
+            self.lineage_birth_rate_function = RateFunction(
+                    definition_type="lambda_definition",
+                    definition_content="lambda lineage: 0.01",
+                    description="fixed: 0.01",
+                    trait_types=self.trait_types,
+                    )
+        if run_logger is not None:
+            run_logger.info("(DIVERSIFICATION) Setting lineage-specific birth rate function: {desc}".format(
+                desc=self.lineage_birth_rate_function.description,))
+        ## extinction
+        if "lineage_death_rate" in diversification_d:
+            self.lineage_death_rate_function = RateFunction.from_definition_dict(diversification_d.pop("lineage_death_rate"), self.trait_types)
+        else:
+            self.lineage_death_rate_function = RateFunction(
+                    definition_type="lambda_definition",
+                    definition_content="lambda lineage: 0.0",
+                    description="fixed: 0.0",
+                    trait_types=self.trait_types,
+                    )
+        if run_logger is not None:
+            run_logger.info("(DIVERSIFICATION) Setting lineage-specific death rate function: {desc}".format(
+                desc=self.lineage_death_rate_function.description,))
+        if diversification_d:
+            raise TypeError("Unsupported diversification model keywords: {}".format(diversification_d))
+
+        # Dispersal submodel
+        anagenetic_range_evolution_d = dict(model_definition.pop("anagenetic_range_evolution", {}))
+        # if "global_area_gain_rate" not in anagenetic_range_evolution_d and "mean_area_gain_rate" not in anagenetic_range_evolution_d:
+        #     if interpolate_missing_model_values:
+        #         anagenetic_range_evolution_d["global_area_gain_rate"] = 1.0
+        #     else:
+        #         raise TypeError("Exactly one of 'global_area_gain_rate' or 'mean_area_gain_rate' must be specified")
+        # if "global_area_gain_rate" in anagenetic_range_evolution_d and "mean_area_gain_rate" in anagenetic_range_evolution_d:
+        #     raise TypeError("No more than one of 'global_area_gain_rate' or 'mean_area_gain_rate' can be specified")
+        # elif "global_area_gain_rate" in anagenetic_range_evolution_d:
+        #     self.global_area_gain_rate = float(anagenetic_range_evolution_d.pop("global_area_gain_rate"))
+        #     self.mean_area_gain_rate = None
+        #     if run_logger is not None:
+        #         run_logger.info("(ANAGENETIC RANGE EVOLUTION) Global area gain rate is: {}".format(self.global_area_gain_rate))
+        #     self.geography.set_global_area_gain_rate(self.global_area_gain_rate)
+        # else:
+        #     self.mean_area_gain_rate = float(anagenetic_range_evolution_d.pop("mean_area_gain_rate"))
+        #     self.global_area_gain_rate = None
+        #     run_logger.info("(ANAGENETIC RANGE EVOLUTION) Mean area gain rate is: {}".format(self.mean_area_gain_rate))
+        #     self.geography.set_mean_area_gain_rate(self.mean_area_gain_rate)
+        # if run_logger is not None:
+        #     for a1, area1 in enumerate(self.geography.areas):
+        #         run_logger.info("(ANAGENETIC RANGE EVOLUTION) Effective rate of area gain from area '{}': {}".format(area1.label, self.geography.effective_area_gain_rates[a1]))
+
+        if "lineage_area_gain_rate" in anagenetic_range_evolution_d:
+            self.lineage_area_gain_rate_function = RateFunction.from_definition_dict(anagenetic_range_evolution_d.pop("lineage_area_gain_rate"), self.trait_types)
+        else:
+            self.lineage_area_gain_rate_function = RateFunction(
+                    definition_type="lambda_definition",
+                    definition_content="lambda lineage: 0.01",
+                    description="fixed: 0.01",
+                    trait_types=self.trait_types,
+                    )
+        if run_logger is not None:
+            run_logger.info("(ANAGENETIC RANGE EVOLUTION) Setting lineage-specific area gain weight function: {desc}".format(
+                desc=self.lineage_area_gain_rate_function.description,))
+
+        ## extinction
+        # self.treat_area_loss_rate_as_lineage_death_rate = strtobool(str(anagenetic_range_evolution_d.pop("treat_area_loss_rate_as_lineage_death_rate", 0)))
+        if "lineage_area_loss_rate" in anagenetic_range_evolution_d:
+            self.lineage_area_loss_rate_function = RateFunction.from_definition_dict(anagenetic_range_evolution_d.pop("lineage_area_loss_rate"), self.trait_types)
+        else:
+            self.lineage_area_loss_rate_function = RateFunction(
+                    definition_type="lambda_definition",
+                    definition_content="lambda lineage: 0.0",
+                    description="fixed: 0.0",
+                    trait_types=self.trait_types,
+                    )
+        if run_logger is not None:
+            run_logger.info("(ANAGENETIC RANGE EVOLUTION) Setting lineage-specific area loss weight function: {desc}".format(
+                desc=self.lineage_area_loss_rate_function.description,
+                ))
+
+        if anagenetic_range_evolution_d:
+            raise TypeError("Unsupported keywords in anagenetic range evolution submodel: {}".format(anagenetic_range_evolution_d))
+
+        # Cladogenetic range inheritance submodel
+        cladogenesis_d = dict(model_definition.pop("cladogenetic_range_evolution", {}))
+        self.cladogenesis_sympatric_subset_speciation_weight = float(cladogenesis_d.pop("sympatric_subset_speciation_weight", 1.0))
+        self.cladogenesis_single_area_vicariance_speciation_weight = float(cladogenesis_d.pop("single_area_vicariance_speciation_weight", 1.0))
+        self.cladogenesis_widespread_vicariance_speciation_weight = float(cladogenesis_d.pop("widespread_vicariance_speciation_weight", 1.0))
+        self.cladogenesis_founder_event_speciation_weight = float(cladogenesis_d.pop("founder_event_speciation_weight", 0.0))
+        if cladogenesis_d:
+            raise TypeError("Unsupported keywords in cladogenetic range evolution submodel: {}".format(cladogenesis_d))
+        if run_logger is not None:
+            run_logger.info("(CLADOGENETIC RANGE EVOLUTION) Base weight of sympatric subset speciation mode: {}".format(self.cladogenesis_sympatric_subset_speciation_weight))
+            run_logger.info("(CLADOGENETIC RANGE EVOLUTION) Base weight of single area vicariance speciation mode: {}".format(self.cladogenesis_single_area_vicariance_speciation_weight))
+            run_logger.info("(CLADOGENETIC RANGE EVOLUTION) Base weight of widespread vicariance speciation mode: {}".format(self.cladogenesis_widespread_vicariance_speciation_weight))
+            run_logger.info("(CLADOGENETIC RANGE EVOLUTION) Base weight of founder event speciation ('jump dispersal') mode: {} (note that the effective weight of this event for each lineage is actually the product of this and the lineage-specific area gain weight)".format(self.cladogenesis_founder_event_speciation_weight))
+
+        termination_conditions_d = dict(model_definition.pop("termination_conditions", {}))
+        self.target_focal_area_lineages = termination_conditions_d.pop("target_focal_area_lineages", None)
+        self.gsa_termination_focal_area_lineages = termination_conditions_d.pop("gsa_termination_focal_area_lineages", None)
+        self.max_time = termination_conditions_d.pop("max_time", None)
+        if termination_conditions_d:
+            raise TypeError("Unsupported termination condition model keywords: {}".format(termination_conditions_d))
+        if self.gsa_termination_focal_area_lineages and not self.target_focal_area_lineages:
+            raise ValueError("Cannot specify 'gsa_termination_focal_area_lineages' without specifying 'target_focal_area_lineages'")
+        if self.target_focal_area_lineages is None and self.max_time is None:
+            if run_logger is not None:
+                run_logger.info("Termination conditions not specified: default termination conditions applied")
+            self.target_focal_area_lineages = 50
+        if not self.target_focal_area_lineages and self.max_time:
+            desc = "Simulation will terminate at time t = {}".format(self.max_time)
+        elif self.target_focal_area_lineages and not self.gsa_termination_focal_area_lineages and not self.max_time:
+            desc = "Simulation will terminate when there are {} lineages in focal areas (no time limit)".format(self.target_focal_area_lineages)
+        elif self.target_focal_area_lineages and not self.gsa_termination_focal_area_lineages and self.max_time:
+            desc = "Simulation will terminate at time t = {} or when there are {} lineages in focal areas".format(self.max_time, self.target_focal_area_lineages)
+        elif self.target_focal_area_lineages and self.gsa_termination_focal_area_lineages and not self.max_time:
+            desc = "Simulation will terminate when there are {} lineages in focal areas (with the phylogeny sampled at a random slice of time when there were {} extant lineages in the focal areas)".format(self.gsa_termination_focal_area_lineages, self.target_focal_area_lineages)
+        elif self.target_focal_area_lineages and self.gsa_termination_focal_area_lineages and self.max_time:
+            desc = "Simulation will terminate at time t = {} or when there are {} lineages in focal areas (with the phylogeny sampled at a random slice of time when there were {} extant lineages in the focal areas)".format(self.max_time, self.gsa_termination_focal_area_lineages, self.target_focal_area_lineages)
+        elif not self.target_focal_area_lineages and not self.max_time:
+            raise ValueError("Unspecified termination condition")
+        else:
+            raise ValueError("Unsupported termination condition(s)")
+        if run_logger is not None:
+            run_logger.info(desc)
+
+        if model_definition:
+            raise TypeError("Unsupported model keywords: {}".format(model_definition))
+
+    def encode_lineage(self,
+            lineage,
+            set_label=False,
+            add_annotation=False,
+            exclude_supplemental_areas=False,
+            ):
+        encoded_label = ArchipelagoModel.compose_encoded_label(
+                lineage=lineage,
+                excluded_area_indexes=self.geography.supplemental_area_indexes if exclude_supplemental_areas else None,
+                )
+        if set_label:
+            lineage.label =encoded_label
+        if add_annotation:
+            lineage.annotations.drop()
+            lineage.annotations.add_new("traits_v", traits_v)
+            lineage.annotations.add_new("distribution", areas_v)
+            for trait_idx, trait in enumerate(self.trait_types):
+                lineage.annotations.add_new(trait.label, lineage.traits_vector[trait_idx])
+            area_list = []
+            for area_idx, area in enumerate(self.geography.areas):
+                if exclude_supplemental_areas and area.is_supplemental:
+                    continue
+                if lineage.distribution_vector[area_idx] == 1:
+                    area_list.append(area.label)
+            lineage.annotations.add_new("areas", area_list)
+        return encoded_label
+
+    def write_model(self, out):
+        model_definition = collections.OrderedDict()
+        model_definition["model_id"] = self.model_id
+        model_definition["areas"] = self.geography.as_definition()
+        model_definition["traits"] = self.trait_types.as_definition()
+        model_definition["diversification"] = self.diversification_as_definition()
+        model_definition["anagenetic_range_evolution"] = self.anagenetic_range_evolution_as_definition()
+        model_definition["cladogenetic_range_evolution"] = self.cladogenetic_range_evolution_as_definition()
+        model_definition["termination_conditions"] = self.termination_conditions_as_definition()
+        json.dump(model_definition, out, indent=4, separators=(',', ': '))
+
+    def diversification_as_definition(self):
+        d = collections.OrderedDict()
+        d["lineage_birth_rate"] = self.lineage_birth_rate_function.as_definition()
+        d["lineage_death_rate"] = self.lineage_death_rate_function.as_definition()
+        return d
+
+    def anagenetic_range_evolution_as_definition(self):
+        d = collections.OrderedDict()
+        # if self.global_area_gain_rate is not None and self.mean_area_gain_rate is not None:
+        #     raise TypeError("Both 'global_area_gain_rate' and 'mean_area_gain_rate' are populated")
+        # elif self.global_area_gain_rate is None and self.mean_area_gain_rate is None:
+        #     raise TypeError("Neither 'global_area_gain_rate' and 'mean_area_gain_rate' are populated")
+        # elif self.global_area_gain_rate is not None:
+        #     d["global_area_gain_rate"] = self.global_area_gain_rate
+        # else:
+        #     d["mean_area_gain_rate"] = self.mean_area_gain_rate
+        d["lineage_area_gain_rate"] = self.lineage_area_gain_rate_function.as_definition()
+        d["lineage_area_loss_rate"] = self.lineage_area_loss_rate_function.as_definition()
+        return d
+
+    def cladogenetic_range_evolution_as_definition(self):
+        d = collections.OrderedDict()
+        d["sympatric_subset_speciation_weight"] = self.cladogenesis_sympatric_subset_speciation_weight
+        d["single_area_vicariance_speciation_weight"] = self.cladogenesis_single_area_vicariance_speciation_weight
+        d["widespread_vicariance_speciation_weight"] = self.cladogenesis_widespread_vicariance_speciation_weight
+        d["founder_event_speciation_weight"] = self.cladogenesis_founder_event_speciation_weight
+        return d
+
+    def termination_conditions_as_definition(self):
+        d = collections.OrderedDict()
+        d["target_focal_area_lineages"] = self.target_focal_area_lineages
+        d["gsa_termination_focal_area_lineages"] = self.gsa_termination_focal_area_lineages
+        d["max_time"] = self.max_time
+        return d
+
 
 
 if __name__ == "__main__":
@@ -595,5 +996,9 @@ if __name__ == "__main__":
     rb_data = os.path.join(utility.TEST_DATA_PATH, "revbayes", "bg_large.events.txt")
     rb_data_src = open(rb_data, "r")
     hrs.parse_host_biogeography(rb_data_src)
-    hr = hrs.host_regimes[0]
-    hs = HostSystem(hr)
+    for host_regime in hrs.host_regimes:
+        im = InphestModel.create(
+                host_regime=host_regime,
+                model_definition_source={},
+                model_definition_type="python-dict",
+                )
