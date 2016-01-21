@@ -61,6 +61,8 @@ class RevBayesBiogeographyParser(object):
         self.edge_entries = []
         ## events organized by bipartition
         self.event_schedules_by_edge = collections.defaultdict(dendropy.Bipartition)
+        ## track deepest event on tree
+        self.max_event_times = {}
         ### taxon management
         if taxon_namespace is None:
             self.taxon_namespace = dendropy.TaxonNamespace()
@@ -101,6 +103,8 @@ class RevBayesBiogeographyParser(object):
             tree.encode_bipartitions()
             # print(tree.as_string("newick", suppress_annotations=True))
             tree.calc_node_ages(ultrametricity_precision=0.01)
+            tree_entry["seed_node_age"] = tree.seed_node.age
+            # print(tree.seed_node.age)
             for nd in tree:
                 edge_entry = {}
                 edge_entry["tree_idx"] = tree_idx
@@ -144,6 +148,10 @@ class RevBayesBiogeographyParser(object):
                     event_entry["tree_idx"] = edge_entry["tree_idx"]
                     event_entry["edge_id"] = edge_entry["edge_id"]
                     event_entry["age"] = event["age"]
+                    try:
+                        self.max_event_times[tree_idx] = max(event_entry["age"], self.max_event_times[tree_idx])
+                    except KeyError:
+                        self.max_event_times[tree_idx] = event_entry["age"]
                     # event_entry["time"] = event["time"]
                     event_entry["event_type"] = "anagenesis"
                     if event["to_state"] == "1":

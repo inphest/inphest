@@ -122,6 +122,60 @@ class StatesVector(object):
     def __repr__(self):
         return str(self._states)
 
+class RateFunction(object):
+
+    @classmethod
+    def from_definition_dict(cls, rate_function_d):
+        rf = cls()
+        rf.parse_definition(rate_function_d)
+        return rf
+
+    def __init__(self,
+            definition_type=None,
+            definition_content=None,
+            description=None,
+            ):
+        self.definition_type = definition_type # value, lambda, function, map
+        self.definition_content = definition_content
+        self.description = description
+        self._compute_rate = None
+        if self.definition_content is not None:
+            self.compile_function()
+
+    def __call__(self, lineage):
+        return self._compute_rate(lineage)
+
+    def parse_definition(self, rate_function_d):
+        rate_function_d = dict(rate_function_d)
+        self.definition_type = rate_function_d.pop("definition_type").replace("-", "_")
+        self.definition_content = rate_function_d.pop("definition")
+        self.description = rate_function_d.pop("description", "")
+        if rate_function_d:
+            raise TypeError("Unsupported function definition keywords: {}".format(rate_function_d))
+        self.compile_function()
+
+    def compile_function(self):
+        self.definition_type = self.definition_type.replace("-", "_")
+        if self.definition_type == "fixed_value":
+            self.definition_content = float(self.definition_content)
+            self._compute_rate = lambda lineage: self.definition_content
+        elif self.definition_type == "lambda_definition":
+            self._compute_rate = eval(self.definition_content)
+        elif self.definition_type == "function_object":
+            self._compute_rate = self.definition_content
+        else:
+            raise ValueError("Unrecognized function definition type: '{}'".format(self.definition_type))
+
+    def as_definition(self):
+        d = collections.OrderedDict()
+        d["definition_type"] = self.definition_type
+        if d["definition_type"] == "function_object":
+            d["definition"] = str(self.definition_content)
+        else:
+            d["definition"] = self.definition_content
+        d["description"] = self.description
+        return d
+
 class HostRegime(object):
     """
     A particular host history on which the symbiont history is conditioned.
@@ -172,7 +226,7 @@ class HostRegime(object):
             s._states = list(self._states)
             return s
 
-    def __init__(self, taxon_namespace=None):
+    def __init__(self, taxon_namespace=None,):
         if taxon_namespace is None:
             self.taxon_namespace = dendropy.TaxonNamespace()
         else:
@@ -180,9 +234,16 @@ class HostRegime(object):
         self.next_event_index = 0
         self.events = [] # collection of HostEvent objects, sorted by time
         self.lineages = {} # keys: lineage_id (== int(Bipartition) == Bipartition.bitmask); values: HostRegimeLineageDefinition
+        self.start_time = None
+        self.end_time = None
 
-    def compile(self):
+    def compile(self, start_time, end_time):
+        self.start_time = start_time
+        self.end_time = end_time
         self.events.sort(key=lambda x: x.event_time)
+        for event in self.events:
+            assert event.event_time >= self.start_time
+            assert event.event_time <= self.end_time, "{} > {}".format(event.event_time, self.end_time)
         # print(self.events)
 
 class HostRegimeSamples(object):
@@ -208,7 +269,7 @@ class HostRegimeSamples(object):
         #     self.tree_probabilities.append(tree_entry["posterior"]/total_tree_ln_likelihoods)
 
         tree_host_regimes = {}
-
+        # tree_root_heights = {}
         for edge_entry in rb.edge_entries:
             tree_idx = edge_entry["tree_idx"]
             if tree_idx not in tree_host_regimes:
@@ -222,6 +283,10 @@ class HostRegimeSamples(object):
                     )
             assert lineage.lineage_id not in tree_host_regimes[tree_idx].lineages
             tree_host_regimes[tree_idx].lineages[lineage_id] = lineage
+            # try:
+            #     tree_root_heights[tree_idx] = max(edge_entry["edge_ending_age"], tree_root_heights[tree_idx])
+            # except KeyError:
+            #     tree_root_heights[tree_idx] = edge_entry["edge_ending_age"]
 
         for event_entry in rb.event_schedules_by_tree:
             tree_idx = event_entry["tree_idx"]
@@ -241,8 +306,14 @@ class HostRegimeSamples(object):
                 )
             assert event.lineage_id in tree_host_regimes[tree_idx].lineages
             tree_host_regimes[tree_idx].events.append(event)
-        for host_regime in tree_host_regimes.values():
-            host_regime.compile()
+        for tree_idx in tree_host_regimes:
+            host_regime  = tree_host_regimes[tree_idx]
+            # end_time = tree_root_heights[tree_idx]
+            host_regime.compile(
+                    start_time=0.0,
+                    # end_time=rb.tree_entries[tree_idx]["seed_node_age"],
+                    end_time=rb.max_event_times[tree_idx],
+                    )
             self.host_regimes.append(host_regime)
 
 class HostSystem(object):
@@ -660,9 +731,10 @@ class InphestModel(object):
             model_definition,
             interpolate_missing_model_values=False,
             run_logger=None):
-        archipelago_model = cls(host_regime=host_regime)
+        archipelago_model = cls()
         archipelago_model.parse_definition(
                 model_definition=model_definition,
+                host_regime=host_regime,
                 interpolate_missing_model_values=interpolate_missing_model_values,
                 run_logger=run_logger,
         )
@@ -737,11 +809,12 @@ class InphestModel(object):
         #         nd.traits_vector = None
         #         nd.distribution_vector = None
 
-    def __init__(self, host_regime):
-        self.host_regime = host_regime
+    def __init__(self):
+        pass
 
     def parse_definition(self,
             model_definition,
+            host_regime,
             run_logger=None,
             interpolate_missing_model_values=True):
 
@@ -751,7 +824,7 @@ class InphestModel(object):
         else:
             model_definition = dict(model_definition)
 
-        # mode identification
+        # model identification
         if "model_id" not in model_definition:
             model_definition["model_id"] = "Model1"
             if run_logger is not None:
@@ -760,156 +833,128 @@ class InphestModel(object):
         if run_logger is not None:
             run_logger.info("Setting up model with identifier: '{}'".format(self.model_id))
 
-        # Geography
-        if "areas" not in model_definition:
-            if interpolate_missing_model_values:
-                model_definition["areas"] = [
-                        {'is_supplemental': False, 'label': 'a1'},
-                        {'is_supplemental': False, 'label': 'a2'},
-                        {'is_supplemental': False, 'label': 'a3'},
-                        {'is_supplemental': False, 'label': 'a4'},
-                        {'is_supplemental': True, 'label': 's1'}
-                ]
-            else:
-                raise ValueError("No areas defined")
-        self.geography = Geography()
-        self.geography.parse_definition(
-                copy.deepcopy(model_definition.pop("areas", [])),
-                run_logger=run_logger)
-
-        # Ecology
-        self.trait_types = TraitTypes()
-        self.trait_types.parse_definition(
-                copy.deepcopy(model_definition.pop("traits", [])),
-                run_logger=run_logger)
+        # host regime
+        self.host_regime = host_regime
 
         # Diversification
+
         ## speciation
         diversification_d = dict(model_definition.pop("diversification", {}))
-        if "lineage_birth_rate" in diversification_d:
-            self.lineage_birth_rate_function = RateFunction.from_definition_dict(diversification_d.pop("lineage_birth_rate"), self.trait_types)
+        if "symbiont_lineage_birth_rate" in diversification_d:
+            self.symbiont_lineage_birth_rate_function = RateFunction.from_definition_dict(diversification_d.pop("symbiont_lineage_birth_rate"))
         else:
-            self.lineage_birth_rate_function = RateFunction(
+            self.symbiont_lineage_birth_rate_function = RateFunction(
                     definition_type="lambda_definition",
-                    definition_content="lambda lineage: 0.01",
+                    definition_content="lambda symbiont_lineage: 0.01",
                     description="fixed: 0.01",
-                    trait_types=self.trait_types,
                     )
         if run_logger is not None:
-            run_logger.info("(DIVERSIFICATION) Setting lineage-specific birth rate function: {desc}".format(
-                desc=self.lineage_birth_rate_function.description,))
+            run_logger.info("(DIVERSIFICATION) Setting symbiont lineage-specific birth rate function: {desc}".format(
+                desc=self.symbiont_lineage_birth_rate_function.description,))
+
         ## extinction
-        if "lineage_death_rate" in diversification_d:
-            self.lineage_death_rate_function = RateFunction.from_definition_dict(diversification_d.pop("lineage_death_rate"), self.trait_types)
+        if "symbiont_lineage_death_rate" in diversification_d:
+            self.symbiont_lineage_death_rate_function = RateFunction.from_definition_dict(diversification_d.pop("symbiont_lineage_death_rate"))
         else:
-            self.lineage_death_rate_function = RateFunction(
+            self.symbiont_lineage_death_rate_function = RateFunction(
                     definition_type="lambda_definition",
-                    definition_content="lambda lineage: 0.0",
+                    definition_content="lambda symbiont_lineage: 0.0",
                     description="fixed: 0.0",
-                    trait_types=self.trait_types,
                     )
         if run_logger is not None:
-            run_logger.info("(DIVERSIFICATION) Setting lineage-specific death rate function: {desc}".format(
-                desc=self.lineage_death_rate_function.description,))
+            run_logger.info("(DIVERSIFICATION) Setting symbiont lineage-specific death rate function: {desc}".format(
+                desc=self.symbiont_lineage_death_rate_function.description,))
         if diversification_d:
             raise TypeError("Unsupported diversification model keywords: {}".format(diversification_d))
 
-        # Dispersal submodel
-        anagenetic_range_evolution_d = dict(model_definition.pop("anagenetic_range_evolution", {}))
-        # if "global_area_gain_rate" not in anagenetic_range_evolution_d and "mean_area_gain_rate" not in anagenetic_range_evolution_d:
-        #     if interpolate_missing_model_values:
-        #         anagenetic_range_evolution_d["global_area_gain_rate"] = 1.0
-        #     else:
-        #         raise TypeError("Exactly one of 'global_area_gain_rate' or 'mean_area_gain_rate' must be specified")
-        # if "global_area_gain_rate" in anagenetic_range_evolution_d and "mean_area_gain_rate" in anagenetic_range_evolution_d:
-        #     raise TypeError("No more than one of 'global_area_gain_rate' or 'mean_area_gain_rate' can be specified")
-        # elif "global_area_gain_rate" in anagenetic_range_evolution_d:
-        #     self.global_area_gain_rate = float(anagenetic_range_evolution_d.pop("global_area_gain_rate"))
-        #     self.mean_area_gain_rate = None
-        #     if run_logger is not None:
-        #         run_logger.info("(ANAGENETIC RANGE EVOLUTION) Global area gain rate is: {}".format(self.global_area_gain_rate))
-        #     self.geography.set_global_area_gain_rate(self.global_area_gain_rate)
-        # else:
-        #     self.mean_area_gain_rate = float(anagenetic_range_evolution_d.pop("mean_area_gain_rate"))
-        #     self.global_area_gain_rate = None
-        #     run_logger.info("(ANAGENETIC RANGE EVOLUTION) Mean area gain rate is: {}".format(self.mean_area_gain_rate))
-        #     self.geography.set_mean_area_gain_rate(self.mean_area_gain_rate)
-        # if run_logger is not None:
-        #     for a1, area1 in enumerate(self.geography.areas):
-        #         run_logger.info("(ANAGENETIC RANGE EVOLUTION) Effective rate of area gain from area '{}': {}".format(area1.label, self.geography.effective_area_gain_rates[a1]))
+        # Host submodel
+        anagenetic_host_range_evolution_d = dict(model_definition.pop("anagenetic_host_range_evolution", {}))
 
-        if "lineage_area_gain_rate" in anagenetic_range_evolution_d:
-            self.lineage_area_gain_rate_function = RateFunction.from_definition_dict(anagenetic_range_evolution_d.pop("lineage_area_gain_rate"), self.trait_types)
+        ## host gain
+        if "symbiont_lineage_host_gain_rate" in anagenetic_host_range_evolution_d:
+            self.symbiont_lineage_host_gain_rate_function = RateFunction.from_definition_dict(anagenetic_host_range_evolution_d.pop("symbiont_lineage_host_gain_rate"))
         else:
-            self.lineage_area_gain_rate_function = RateFunction(
+            self.symbiont_lineage_host_gain_rate_function = RateFunction(
                     definition_type="lambda_definition",
-                    definition_content="lambda lineage: 0.01",
+                    definition_content="lambda symbiont_lineage: 0.01",
                     description="fixed: 0.01",
-                    trait_types=self.trait_types,
                     )
         if run_logger is not None:
-            run_logger.info("(ANAGENETIC RANGE EVOLUTION) Setting lineage-specific area gain weight function: {desc}".format(
-                desc=self.lineage_area_gain_rate_function.description,))
+            run_logger.info("(ANAGENETIC HOST RANGE EVOLUTION) Setting symbiont lineage-specific host gain weight function: {desc}".format(
+                desc=self.symbiont_lineage_host_gain_rate_function.description,))
 
-        ## extinction
-        # self.treat_area_loss_rate_as_lineage_death_rate = strtobool(str(anagenetic_range_evolution_d.pop("treat_area_loss_rate_as_lineage_death_rate", 0)))
-        if "lineage_area_loss_rate" in anagenetic_range_evolution_d:
-            self.lineage_area_loss_rate_function = RateFunction.from_definition_dict(anagenetic_range_evolution_d.pop("lineage_area_loss_rate"), self.trait_types)
+        ## host loss
+        if "symbiont_lineage_host_loss_rate" in anagenetic_host_range_evolution_d:
+            self.symbiont_lineage_host_loss_rate_function = RateFunction.from_definition_dict(anagenetic_host_range_evolution_d.pop("symbiont_lineage_host_loss_rate"))
         else:
-            self.lineage_area_loss_rate_function = RateFunction(
+            self.symbiont_lineage_host_loss_rate_function = RateFunction(
                     definition_type="lambda_definition",
-                    definition_content="lambda lineage: 0.0",
+                    definition_content="lambda symbiont_lineage: 0.0",
                     description="fixed: 0.0",
-                    trait_types=self.trait_types,
                     )
         if run_logger is not None:
-            run_logger.info("(ANAGENETIC RANGE EVOLUTION) Setting lineage-specific area loss weight function: {desc}".format(
-                desc=self.lineage_area_loss_rate_function.description,
+            run_logger.info("(ANAGENETIC HOST RANGE EVOLUTION) Setting symbiont lineage-specific host loss weight function: {desc}".format(
+                desc=self.symbiont_lineage_host_loss_rate_function.description,
                 ))
 
-        if anagenetic_range_evolution_d:
-            raise TypeError("Unsupported keywords in anagenetic range evolution submodel: {}".format(anagenetic_range_evolution_d))
+        if anagenetic_host_range_evolution_d:
+            raise TypeError("Unsupported keywords in anagenetic host range evolution submodel: {}".format(anagenetic_host_range_evolution_d))
 
         # Cladogenetic range inheritance submodel
-        cladogenesis_d = dict(model_definition.pop("cladogenetic_range_evolution", {}))
+        cladogenesis_d = dict(model_definition.pop("cladogenetic_host_range_evolution", {}))
         self.cladogenesis_sympatric_subset_speciation_weight = float(cladogenesis_d.pop("sympatric_subset_speciation_weight", 1.0))
-        self.cladogenesis_single_area_vicariance_speciation_weight = float(cladogenesis_d.pop("single_area_vicariance_speciation_weight", 1.0))
+        self.cladogenesis_single_host_vicariance_speciation_weight = float(cladogenesis_d.pop("single_host_vicariance_speciation_weight", 1.0))
         self.cladogenesis_widespread_vicariance_speciation_weight = float(cladogenesis_d.pop("widespread_vicariance_speciation_weight", 1.0))
         self.cladogenesis_founder_event_speciation_weight = float(cladogenesis_d.pop("founder_event_speciation_weight", 0.0))
         if cladogenesis_d:
             raise TypeError("Unsupported keywords in cladogenetic range evolution submodel: {}".format(cladogenesis_d))
         if run_logger is not None:
-            run_logger.info("(CLADOGENETIC RANGE EVOLUTION) Base weight of sympatric subset speciation mode: {}".format(self.cladogenesis_sympatric_subset_speciation_weight))
-            run_logger.info("(CLADOGENETIC RANGE EVOLUTION) Base weight of single area vicariance speciation mode: {}".format(self.cladogenesis_single_area_vicariance_speciation_weight))
-            run_logger.info("(CLADOGENETIC RANGE EVOLUTION) Base weight of widespread vicariance speciation mode: {}".format(self.cladogenesis_widespread_vicariance_speciation_weight))
-            run_logger.info("(CLADOGENETIC RANGE EVOLUTION) Base weight of founder event speciation ('jump dispersal') mode: {} (note that the effective weight of this event for each lineage is actually the product of this and the lineage-specific area gain weight)".format(self.cladogenesis_founder_event_speciation_weight))
+            run_logger.info("(CLADOGENETIC HOST RANGE EVOLUTION) Base weight of sympatric subset speciation mode: {}".format(self.cladogenesis_sympatric_subset_speciation_weight))
+            run_logger.info("(CLADOGENETIC HOST RANGE EVOLUTION) Base weight of single host vicariance speciation mode: {}".format(self.cladogenesis_single_host_vicariance_speciation_weight))
+            run_logger.info("(CLADOGENETIC HOST RANGE EVOLUTION) Base weight of widespread vicariance speciation mode: {}".format(self.cladogenesis_widespread_vicariance_speciation_weight))
+            run_logger.info("(CLADOGENETIC HOST RANGE EVOLUTION) Base weight of founder event speciation ('jump dispersal') mode: {} (note that the effective weight of this event for each lineage is actually the product of this and the lineage-specific host gain weight)".format(self.cladogenesis_founder_event_speciation_weight))
 
-        termination_conditions_d = dict(model_definition.pop("termination_conditions", {}))
-        self.target_focal_area_lineages = termination_conditions_d.pop("target_focal_area_lineages", None)
-        self.gsa_termination_focal_area_lineages = termination_conditions_d.pop("gsa_termination_focal_area_lineages", None)
-        self.max_time = termination_conditions_d.pop("max_time", None)
-        if termination_conditions_d:
-            raise TypeError("Unsupported termination condition model keywords: {}".format(termination_conditions_d))
-        if self.gsa_termination_focal_area_lineages and not self.target_focal_area_lineages:
-            raise ValueError("Cannot specify 'gsa_termination_focal_area_lineages' without specifying 'target_focal_area_lineages'")
-        if self.target_focal_area_lineages is None and self.max_time is None:
-            if run_logger is not None:
-                run_logger.info("Termination conditions not specified: default termination conditions applied")
-            self.target_focal_area_lineages = 50
-        if not self.target_focal_area_lineages and self.max_time:
-            desc = "Simulation will terminate at time t = {}".format(self.max_time)
-        elif self.target_focal_area_lineages and not self.gsa_termination_focal_area_lineages and not self.max_time:
-            desc = "Simulation will terminate when there are {} lineages in focal areas (no time limit)".format(self.target_focal_area_lineages)
-        elif self.target_focal_area_lineages and not self.gsa_termination_focal_area_lineages and self.max_time:
-            desc = "Simulation will terminate at time t = {} or when there are {} lineages in focal areas".format(self.max_time, self.target_focal_area_lineages)
-        elif self.target_focal_area_lineages and self.gsa_termination_focal_area_lineages and not self.max_time:
-            desc = "Simulation will terminate when there are {} lineages in focal areas (with the phylogeny sampled at a random slice of time when there were {} extant lineages in the focal areas)".format(self.gsa_termination_focal_area_lineages, self.target_focal_area_lineages)
-        elif self.target_focal_area_lineages and self.gsa_termination_focal_area_lineages and self.max_time:
-            desc = "Simulation will terminate at time t = {} or when there are {} lineages in focal areas (with the phylogeny sampled at a random slice of time when there were {} extant lineages in the focal areas)".format(self.max_time, self.gsa_termination_focal_area_lineages, self.target_focal_area_lineages)
-        elif not self.target_focal_area_lineages and not self.max_time:
-            raise ValueError("Unspecified termination condition")
-        else:
-            raise ValueError("Unsupported termination condition(s)")
+        # termination_conditions_d = dict(model_definition.pop("termination_conditions", {}))
+        # self.target_focal_area_lineages = termination_conditions_d.pop("target_focal_area_lineages", None)
+        # self.gsa_termination_focal_area_lineages = termination_conditions_d.pop("gsa_termination_focal_area_lineages", None)
+        # self.max_time = termination_conditions_d.pop("max_time", None)
+        # if termination_conditions_d:
+        #     raise TypeError("Unsupported termination condition model keywords: {}".format(termination_conditions_d))
+        # if self.gsa_termination_focal_area_lineages and not self.target_focal_area_lineages:
+        #     raise ValueError("Cannot specify 'gsa_termination_focal_area_lineages' without specifying 'target_focal_area_lineages'")
+        # if self.target_focal_area_lineages is None and self.max_time is None:
+        #     if run_logger is not None:
+        #         run_logger.info("Termination conditions not specified: default termination conditions applied")
+        #     self.target_focal_area_lineages = 50
+        # if not self.target_focal_area_lineages and self.max_time:
+        #     desc = "Simulation will terminate at time t = {}".format(self.max_time)
+        # elif self.target_focal_area_lineages and not self.gsa_termination_focal_area_lineages and not self.max_time:
+        #     desc = "Simulation will terminate when there are {} lineages in focal areas (no time limit)".format(self.target_focal_area_lineages)
+        # elif self.target_focal_area_lineages and not self.gsa_termination_focal_area_lineages and self.max_time:
+        #     desc = "Simulation will terminate at time t = {} or when there are {} lineages in focal areas".format(self.max_time, self.target_focal_area_lineages)
+        # elif self.target_focal_area_lineages and self.gsa_termination_focal_area_lineages and not self.max_time:
+        #     desc = "Simulation will terminate when there are {} lineages in focal areas (with the phylogeny sampled at a random slice of time when there were {} extant lineages in the focal areas)".format(self.gsa_termination_focal_area_lineages, self.target_focal_area_lineages)
+        # elif self.target_focal_area_lineages and self.gsa_termination_focal_area_lineages and self.max_time:
+        #     desc = "Simulation will terminate at time t = {} or when there are {} lineages in focal areas (with the phylogeny sampled at a random slice of time when there were {} extant lineages in the focal areas)".format(self.max_time, self.gsa_termination_focal_area_lineages, self.target_focal_area_lineages)
+        # elif not self.target_focal_area_lineages and not self.max_time:
+        #     raise ValueError("Unspecified termination condition")
+        # else:
+        #     raise ValueError("Unsupported termination condition(s)")
+        # if run_logger is not None:
+        #     run_logger.info(desc)
+
+        # termination_conditions_d = dict(model_definition.pop("termination_conditions", {}))
+        # self.max_time = termination_conditions_d.pop("max_time", None)
+        # if termination_conditions_d:
+        #     raise TypeError("Unsupported termination condition model keywords: {}".format(termination_conditions_d))
+        # if self.max_time is None:
+        #     raise ValueError("Termination time not specified")
+        # desc = "Simulation will terminate at time t = {}".format(self.max_time)
+        # if run_logger is not None:
+        #     run_logger.info(desc)
+
+        self.max_time = self.host_regime.end_time
+        desc = "Simulation will terminate at time t = {}".format(self.max_time)
         if run_logger is not None:
             run_logger.info(desc)
 
