@@ -321,6 +321,15 @@ class HostSystem(object):
     Models the host system, as defined by a HostRegime, for a particular simulation replicate.
     """
 
+    class Area(object):
+
+        """
+        Manages the state of an area during a particular simulation replicate.
+        """
+
+        def __init__(self, area_idx):
+            self.area_idx = area_idx
+
     class Host(object):
         """
         Manages the state of a host during a particular simulation replicate.
@@ -337,9 +346,11 @@ class HostSystem(object):
 
     def compile(self, host_regime):
         self.host_regime = host_regime
+        self.start_time = self.host_regime.start_time
+        self.end_time = self.host_regime.end_time
         self.host_lineages_by_id = {}
         num_areas = None
-        for host_regime_lineage_id in self.host_regime.lineages.values():
+        for host_regime_lineage_id_definition in self.host_regime.lineages.values():
             host = HostSystem.Host(host_regime_lineage_id_definition)
             self.host_lineages_by_id[host.lineage_id] = host
             if num_areas is None:
@@ -347,6 +358,14 @@ class HostSystem(object):
             assert num_areas == len(host.start_distribution)
             assert num_areas == len(host.end_distribution)
         self.num_areas = num_areas
+        self.areas = {}
+        for area_idx in range(self.num_areas):
+            self.areas[area_idx] = HostSystem.Area(area_idx)
+        self.area_host_symbiont_distribution_matrix = {}
+        for area in self.areas:
+            self.area_host_symbiont_distribution_matrix[area] = {}
+            for host_lineage in self.host_lineages_by_id.values():
+                self.area_host_symbiont_distribution_matrix[area][host_lineage] = {}
 
 class SymbiontHostAreaDistributionMatrix(object):
     """
@@ -834,7 +853,7 @@ class InphestModel(object):
             run_logger.info("Setting up model with identifier: '{}'".format(self.model_id))
 
         # host regime
-        self.host_regime = host_regime
+        self.host_system = HostSystem(host_regime)
 
         # Diversification
 
@@ -867,10 +886,14 @@ class InphestModel(object):
         if diversification_d:
             raise TypeError("Unsupported diversification model keywords: {}".format(diversification_d))
 
-        # Host submodel
+        # Host Submodel
+
+        ## Anagenetic Host Evolution Submodel
+
         anagenetic_host_range_evolution_d = dict(model_definition.pop("anagenetic_host_range_evolution", {}))
 
-        ## host gain
+        ### Anagenetic Host Gain
+
         if "symbiont_lineage_host_gain_rate" in anagenetic_host_range_evolution_d:
             self.symbiont_lineage_host_gain_rate_function = RateFunction.from_definition_dict(anagenetic_host_range_evolution_d.pop("symbiont_lineage_host_gain_rate"))
         else:
@@ -883,7 +906,8 @@ class InphestModel(object):
             run_logger.info("(ANAGENETIC HOST RANGE EVOLUTION) Setting symbiont lineage-specific host gain weight function: {desc}".format(
                 desc=self.symbiont_lineage_host_gain_rate_function.description,))
 
-        ## host loss
+        ### Anagenetic Host Loss
+
         if "symbiont_lineage_host_loss_rate" in anagenetic_host_range_evolution_d:
             self.symbiont_lineage_host_loss_rate_function = RateFunction.from_definition_dict(anagenetic_host_range_evolution_d.pop("symbiont_lineage_host_loss_rate"))
         else:
@@ -900,60 +924,74 @@ class InphestModel(object):
         if anagenetic_host_range_evolution_d:
             raise TypeError("Unsupported keywords in anagenetic host range evolution submodel: {}".format(anagenetic_host_range_evolution_d))
 
-        # Cladogenetic range inheritance submodel
-        cladogenesis_d = dict(model_definition.pop("cladogenetic_host_range_evolution", {}))
-        self.cladogenesis_sympatric_subset_speciation_weight = float(cladogenesis_d.pop("sympatric_subset_speciation_weight", 1.0))
-        self.cladogenesis_single_host_vicariance_speciation_weight = float(cladogenesis_d.pop("single_host_vicariance_speciation_weight", 1.0))
-        self.cladogenesis_widespread_vicariance_speciation_weight = float(cladogenesis_d.pop("widespread_vicariance_speciation_weight", 1.0))
-        self.cladogenesis_founder_event_speciation_weight = float(cladogenesis_d.pop("founder_event_speciation_weight", 0.0))
-        if cladogenesis_d:
-            raise TypeError("Unsupported keywords in cladogenetic range evolution submodel: {}".format(cladogenesis_d))
+        ## Cladogenetic Host Evolution Submodel
+
+        cladogenetic_host_range_evolution = dict(model_definition.pop("cladogenetic_host_range_evolution", {}))
+        self.cladogenesis_sympatric_subset_speciation_weight = float(cladogenetic_host_range_evolution.pop("sympatric_subset_speciation_weight", 1.0))
+        self.cladogenesis_single_host_vicariance_speciation_weight = float(cladogenetic_host_range_evolution.pop("single_host_vicariance_speciation_weight", 1.0))
+        self.cladogenesis_widespread_vicariance_speciation_weight = float(cladogenetic_host_range_evolution.pop("widespread_vicariance_speciation_weight", 1.0))
+        self.cladogenesis_founder_event_speciation_weight = float(cladogenetic_host_range_evolution.pop("founder_event_speciation_weight", 0.0))
+        if cladogenetic_host_range_evolution:
+            raise TypeError("Unsupported keywords in cladogenetic range evolution submodel: {}".format(cladogenetic_host_range_evolution))
         if run_logger is not None:
             run_logger.info("(CLADOGENETIC HOST RANGE EVOLUTION) Base weight of sympatric subset speciation mode: {}".format(self.cladogenesis_sympatric_subset_speciation_weight))
             run_logger.info("(CLADOGENETIC HOST RANGE EVOLUTION) Base weight of single host vicariance speciation mode: {}".format(self.cladogenesis_single_host_vicariance_speciation_weight))
             run_logger.info("(CLADOGENETIC HOST RANGE EVOLUTION) Base weight of widespread vicariance speciation mode: {}".format(self.cladogenesis_widespread_vicariance_speciation_weight))
             run_logger.info("(CLADOGENETIC HOST RANGE EVOLUTION) Base weight of founder event speciation ('jump dispersal') mode: {} (note that the effective weight of this event for each lineage is actually the product of this and the lineage-specific host gain weight)".format(self.cladogenesis_founder_event_speciation_weight))
 
-        # termination_conditions_d = dict(model_definition.pop("termination_conditions", {}))
-        # self.target_focal_area_lineages = termination_conditions_d.pop("target_focal_area_lineages", None)
-        # self.gsa_termination_focal_area_lineages = termination_conditions_d.pop("gsa_termination_focal_area_lineages", None)
-        # self.max_time = termination_conditions_d.pop("max_time", None)
-        # if termination_conditions_d:
-        #     raise TypeError("Unsupported termination condition model keywords: {}".format(termination_conditions_d))
-        # if self.gsa_termination_focal_area_lineages and not self.target_focal_area_lineages:
-        #     raise ValueError("Cannot specify 'gsa_termination_focal_area_lineages' without specifying 'target_focal_area_lineages'")
-        # if self.target_focal_area_lineages is None and self.max_time is None:
-        #     if run_logger is not None:
-        #         run_logger.info("Termination conditions not specified: default termination conditions applied")
-        #     self.target_focal_area_lineages = 50
-        # if not self.target_focal_area_lineages and self.max_time:
-        #     desc = "Simulation will terminate at time t = {}".format(self.max_time)
-        # elif self.target_focal_area_lineages and not self.gsa_termination_focal_area_lineages and not self.max_time:
-        #     desc = "Simulation will terminate when there are {} lineages in focal areas (no time limit)".format(self.target_focal_area_lineages)
-        # elif self.target_focal_area_lineages and not self.gsa_termination_focal_area_lineages and self.max_time:
-        #     desc = "Simulation will terminate at time t = {} or when there are {} lineages in focal areas".format(self.max_time, self.target_focal_area_lineages)
-        # elif self.target_focal_area_lineages and self.gsa_termination_focal_area_lineages and not self.max_time:
-        #     desc = "Simulation will terminate when there are {} lineages in focal areas (with the phylogeny sampled at a random slice of time when there were {} extant lineages in the focal areas)".format(self.gsa_termination_focal_area_lineages, self.target_focal_area_lineages)
-        # elif self.target_focal_area_lineages and self.gsa_termination_focal_area_lineages and self.max_time:
-        #     desc = "Simulation will terminate at time t = {} or when there are {} lineages in focal areas (with the phylogeny sampled at a random slice of time when there were {} extant lineages in the focal areas)".format(self.max_time, self.gsa_termination_focal_area_lineages, self.target_focal_area_lineages)
-        # elif not self.target_focal_area_lineages and not self.max_time:
-        #     raise ValueError("Unspecified termination condition")
-        # else:
-        #     raise ValueError("Unsupported termination condition(s)")
-        # if run_logger is not None:
-        #     run_logger.info(desc)
+        # Geographical Range Evolution Submodel
 
-        # termination_conditions_d = dict(model_definition.pop("termination_conditions", {}))
-        # self.max_time = termination_conditions_d.pop("max_time", None)
-        # if termination_conditions_d:
-        #     raise TypeError("Unsupported termination condition model keywords: {}".format(termination_conditions_d))
-        # if self.max_time is None:
-        #     raise ValueError("Termination time not specified")
-        # desc = "Simulation will terminate at time t = {}".format(self.max_time)
-        # if run_logger is not None:
-        #     run_logger.info(desc)
+        ## Anagenetic Geographical Range Evolution Submodel
 
-        self.max_time = self.host_regime.end_time
+        ### Anagenetic Geographical Area Gain
+
+        anagenetic_geographical_range_evolution_d = dict(model_definition.pop("anagenetic_geographical_range_evolution", {}))
+        if "lineage_area_gain_rate" in anagenetic_geographical_range_evolution_d:
+            self.lineage_area_gain_rate_function = RateFunction.from_definition_dict(anagenetic_geographical_range_evolution_d.pop("lineage_area_gain_rate"), self.trait_types)
+        else:
+            self.lineage_area_gain_rate_function = RateFunction(
+                    definition_type="lambda_definition",
+                    definition_content="lambda lineage: 0.01",
+                    description="fixed: 0.01",
+                    )
+        if run_logger is not None:
+            run_logger.info("(ANAGENETIC GEOGRAPHICAL RANGE EVOLUTION) Setting symbiont lineage-specific area gain weight function: {desc}".format(
+                desc=self.lineage_area_gain_rate_function.description,))
+
+        ### Anagenetic Geographical Area Gain
+
+        if "lineage_area_loss_rate" in anagenetic_geographical_range_evolution_d:
+            self.lineage_area_loss_rate_function = RateFunction.from_definition_dict(anagenetic_geographical_range_evolution_d.pop("lineage_area_loss_rate"), self.trait_types)
+        else:
+            self.lineage_area_loss_rate_function = RateFunction(
+                    definition_type="lambda_definition",
+                    definition_content="lambda lineage: 0.0",
+                    description="fixed: 0.0",
+                    )
+        if run_logger is not None:
+            run_logger.info("(ANAGENETIC GEOGRAPHICAL RANGE EVOLUTION) Setting symbiont lineage-specific area loss weight function: {desc}".format(
+                desc=self.lineage_area_loss_rate_function.description,
+                ))
+
+        if anagenetic_geographical_range_evolution_d:
+            raise TypeError("Unsupported keywords in anagenetic geographical range evolution submodel: {}".format(anagenetic_geographical_range_evolution_d))
+
+        ## Cladogenetic Geographical Evolution Submodel
+
+        cladogenesis_geographical_range_evolution_d = dict(model_definition.pop("cladogenetic_geographical_range_evolution", {}))
+        self.cladogenesis_sympatric_subset_speciation_weight = float(cladogenesis_geographical_range_evolution_d.pop("sympatric_subset_speciation_weight", 1.0))
+        self.cladogenesis_single_area_vicariance_speciation_weight = float(cladogenesis_geographical_range_evolution_d.pop("single_area_vicariance_speciation_weight", 1.0))
+        self.cladogenesis_widespread_vicariance_speciation_weight = float(cladogenesis_geographical_range_evolution_d.pop("widespread_vicariance_speciation_weight", 1.0))
+        self.cladogenesis_founder_event_speciation_weight = float(cladogenesis_geographical_range_evolution_d.pop("founder_event_speciation_weight", 0.0))
+        if cladogenesis_geographical_range_evolution_d:
+            raise TypeError("Unsupported keywords in cladogenetic geographical range evolution submodel: {}".format(cladogenesis_geographical_range_evolution_d))
+        if run_logger is not None:
+            run_logger.info("(CLADOGENETIC GEOGRAPHICAL RANGE EVOLUTION) Base weight of sympatric subset speciation mode: {}".format(self.cladogenesis_sympatric_subset_speciation_weight))
+            run_logger.info("(CLADOGENETIC GEOGRAPHICAL RANGE EVOLUTION) Base weight of single area vicariance speciation mode: {}".format(self.cladogenesis_single_area_vicariance_speciation_weight))
+            run_logger.info("(CLADOGENETIC GEOGRAPHICAL RANGE EVOLUTION) Base weight of widespread vicariance speciation mode: {}".format(self.cladogenesis_widespread_vicariance_speciation_weight))
+            run_logger.info("(CLADOGENETIC GEOGRAPHICAL RANGE EVOLUTION) Base weight of founder event speciation ('jump dispersal') mode: {} (note that the effective weight of this event for each lineage is actually the product of this and the lineage-specific area gain weight)".format(self.cladogenesis_founder_event_speciation_weight))
+
+        self.max_time = self.host_system.end_time
         desc = "Simulation will terminate at time t = {}".format(self.max_time)
         if run_logger is not None:
             run_logger.info(desc)
