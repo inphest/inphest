@@ -515,11 +515,18 @@ def repeat_run(
                     is_verbose_setup = False
                     model_setup_logger = None
                 inphest_model = model.InphestModel.create(
+                        host_regime=host_regime,
                         model_definition_source=model_definition_source,
                         model_definition_type=model_definition_type,
                         interpolate_missing_model_values=interpolate_missing_model_values,
                         run_logger=model_setup_logger,
                         )
+                # inphest_model = model.InphestModel.create(
+                #         model_definition_source=model_definition_source,
+                #         model_definition_type=model_definition_type,
+                #         interpolate_missing_model_values=interpolate_missing_model_values,
+                #         run_logger=model_setup_logger,
+                #         )
                 inphest_simulator = InphestSimulator(
                     inphest_model=inphest_model,
                     config_d=config_d,
