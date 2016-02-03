@@ -184,6 +184,8 @@ class HostRegime(object):
     HostRegimeLineageDefinition = collections.namedtuple("HostRegimeLineageDefinition", [
         # "tree_idx",                 #   identifer of tree from which this lineage has been sampled (same lineage, as given by split id will occur on different trees/histories)
         "lineage_id",               #   lineage (edge/split) id on which event occurs
+        "lineage_start_time",          # time lineage appears
+        "lineage_end_time",            # time lineage ends
         "lineage_start_distribution",  #   distribution/range (area set) at beginning of lineage
         "lineage_end_distribution",    #   distribution/range (area set) at end of lineage
     ])
@@ -278,6 +280,8 @@ class HostRegimeSamples(object):
             lineage = HostRegime.HostRegimeLineageDefinition(
                     # tree_idx=edge_entry["tree_idx"],
                     lineage_id=lineage_id,
+                    lineage_start_time=edge_entry["edge_starting_age"],
+                    lineage_end_time=edge_entry["edge_ending_age"],
                     lineage_start_distribution=HostRegime.HostDistributionVector.from_string(edge_entry["edge_starting_state"]),
                     lineage_end_distribution=HostRegime.HostDistributionVector.from_string(edge_entry["edge_ending_state"]),
                     )
@@ -338,6 +342,8 @@ class HostSystem(object):
         def __init__(self, host_regime_lineage_definition):
             self.host_regime_lineage_definition = host_regime_lineage_definition
             self.lineage_id = host_regime_lineage_definition.lineage_id
+            self.start_time = host_regime_lineage_definition.lineage_start_time
+            self.end_time = host_regime_lineage_definition.lineage_end_time
             self.start_distribution = host_regime_lineage_definition.lineage_start_distribution
             self.end_distribution = host_regime_lineage_definition.lineage_end_distribution
 
@@ -350,6 +356,8 @@ class HostSystem(object):
         self.end_time = self.host_regime.end_time
         self.host_lineages_by_id = {}
         num_areas = None
+
+        # compile lineages
         for host_regime_lineage_id_definition in self.host_regime.lineages.values():
             host = HostSystem.Host(host_regime_lineage_id_definition)
             self.host_lineages_by_id[host.lineage_id] = host
@@ -357,6 +365,8 @@ class HostSystem(object):
                 num_areas = len(host.start_distribution)
             assert num_areas == len(host.start_distribution)
             assert num_areas == len(host.end_distribution)
+
+        # build areas
         self.num_areas = num_areas
         self.areas = {}
         for area_idx in range(self.num_areas):
@@ -367,15 +377,20 @@ class HostSystem(object):
             for host_lineage in self.host_lineages_by_id.values():
                 self.area_host_symbiont_distribution_matrix[area][host_lineage] = {}
 
+    def extant_host_lineages_at_current_time(self, current_time):
+        ## TODO: if we hit this often, we need to construct a look-up table
+        lineages = set()
+        for host in self.host_lineages_by_id.values():
+            if host.start_time >= current_time and host.end_time < current_time:
+                lineages.add(host)
+        return lineages
+
 class SymbiontHostAreaDistributionMatrix(object):
     """
     Manages the host-by-area distribution of a single symbiont lineage.
     """
 
-    def __init__(self,
-            symbiont_lineage,
-            host_system):
-        self.symbiont_lineage = symbiont_lineage
+    def __init__(self, host_system):
         self.host_system = host_system
 
         ## distribution set: tuples of (host_lineage_id, area_idx)
@@ -442,7 +457,7 @@ class SymbiontHostAreaDistributionMatrix(object):
         """
         return self._area_idx_occurences[area_idx] > 0
 
-class Lineage(dendropy.Node):
+class SymbiontLineage(dendropy.Node):
 
     def __init__(self,
             index,
@@ -457,7 +472,7 @@ class Lineage(dendropy.Node):
 class Phylogeny(dendropy.Tree):
 
     def node_factory(cls, **kwargs):
-        return Lineage(**kwargs)
+        return SymbiontLineage(**kwargs)
     node_factory = classmethod(node_factory)
 
     def __init__(self, *args, **kwargs):
@@ -472,10 +487,8 @@ class Phylogeny(dendropy.Tree):
             if "seed_node" not in kwargs:
                 seed_node = self.node_factory(
                         index=next(self.lineage_indexer),
-                        distribution_matrix=self.model.geography.new_distribution_vector(),
+                        distribution_matrix=self.seed_symbiont_distribution_matrix(),
                         )
-                initial_area = self.rng.randint(0, len(seed_node.distribution_vector)-1)
-                seed_node.distribution_vector[initial_area] = 1
                 kwargs["seed_node"] = seed_node
             dendropy.Tree.__init__(self, *args, **kwargs)
             self.current_lineages = set([self.seed_node])
@@ -490,6 +503,21 @@ class Phylogeny(dendropy.Tree):
         memo[id(self.run_logger)] = self.run_logger
         memo[id(self.taxon_namespace)] = self.taxon_namespace
         return dendropy.Tree.__deepcopy__(self, memo)
+
+    def new_symbiont_distribution_matrix(self):
+        dm = SymbiontHostAreaDistributionMatrix(host_system=self.model.host_system)
+        return dm
+
+    def seed_symbiont_distribution_matrix(self):
+        """
+        Creates suitable distribution for initial lineage.
+        """
+        # current logic, single lineage occupying all hosts and areas at the
+        # beginning of the simulation
+        dm = self.new_symbiont_distribution_matrix()
+        extant_host_lineages = self.model.host_system.extant_host_lineages_at_current_time(0)
+        for host_lineage in extant_host_lineages:
+            dm.add_host(host_lineage_id=host_lineage.lineage_id)
 
     def iterate_current_lineages(self):
         for lineage in self.current_lineages:
@@ -585,22 +613,22 @@ class Phylogeny(dendropy.Tree):
             #     -   d1: inherits complete range
             #     -   d2: inherits single area in ancestral range
             dist1 = lineage.distribution_vector.clone()
-            dist2 = self.model.geography.new_distribution_vector()
+            dist2 = self.new_symbiont_distribution_matrix()
             # TODO: area diversity base speciation
             dist2[ self.rng.choice(presences) ] = 1
         elif speciation_mode == 2:
             # (single-area) allopatric vicariance
             #     -   d1: single area
             #     -   d2: all other areas
-            dist1 = self.model.geography.new_distribution_vector()
-            dist2 = self.model.geography.new_distribution_vector()
+            dist1 = self.new_symbiont_distribution_matrix()
+            dist2 = self.new_symbiont_distribution_matrix()
             self.rng.shuffle(presences)
             dist1[presences[0]] = 1
             for idx in presences[1:]:
                 dist2[idx] = 1
         elif speciation_mode == 3:
-            dist1 = self.model.geography.new_distribution_vector()
-            dist2 = self.model.geography.new_distribution_vector()
+            dist1 = self.new_symbiont_distribution_matrix()
+            dist2 = self.new_symbiont_distribution_matrix()
             if num_presences == 2:
                 dist1[presences[0]] = 1
                 dist2[presences[1]] = 1
@@ -618,7 +646,7 @@ class Phylogeny(dendropy.Tree):
                         dist2[idx] = 1
         elif speciation_mode == 4:
             dist1 = lineage.distribution_vector.clone()
-            dist2 = self.model.geography.new_distribution_vector()
+            dist2 = self.new_symbiont_distribution_matrix()
             absences = [idx for idx in self.model.geography.area_indexes if idx not in presences]
             dist2[ self.rng.choice(absences) ] = 1
         else:

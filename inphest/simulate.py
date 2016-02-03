@@ -91,29 +91,13 @@ class InphestSimulator(object):
         if verbose:
             self.run_logger.info("Configuring simulation '{}'".format(self.name))
 
-        if config_d.pop("store_focal_areas_trees", True):
-            self.focal_areas_trees_file = config_d.pop("focal_areas_trees_file", None)
-            if self.focal_areas_trees_file is None:
-                self.focal_areas_trees_file = open(InphestSimulator.compose_focal_areas_trees_filepath(self.output_prefix), "w")
-            if verbose:
-                self.run_logger.info("Focal area trees filepath: {}".format(self.focal_areas_trees_file.name))
-        else:
-            self.focal_areas_trees_file = None
-            if verbose:
-                self.run_logger.info("Focal area trees will not be stored")
+        self.trees_file = config_d.pop("trees_file", None)
+        if self.trees_file is None:
+            self.trees_file = open(InphestSimulator.compose_trees_filepath(self.output_prefix), "w")
+        if verbose:
+            self.run_logger.info("Output trees filepath: {}".format(self.trees_file.name))
 
-        if config_d.pop("store_all_areas_trees", True):
-            self.all_areas_trees_file = config_d.pop("all_areas_trees_file", None)
-            if self.all_areas_trees_file is None:
-                self.all_areas_trees_file = open(InphestSimulator.compose_all_areas_trees_filepath(self.output_prefix), "w")
-            if verbose:
-                self.run_logger.info("All areas trees filepath: {}".format(self.all_areas_trees_file.name))
-        else:
-            self.all_areas_trees_file = None
-            if verbose:
-                self.run_logger.info("All areas trees will not be stored")
-
-        if not self.focal_areas_trees_file and not self.all_areas_trees_file:
+        if not self.trees_file:
             self.run_logger.warning("No trees will be stored!")
 
         self.is_suppress_internal_node_labels = config_d.pop("suppress_internal_node_labels", False)
@@ -172,23 +156,29 @@ class InphestSimulator(object):
 
         ### Save model
         if self.model_description_file is not None:
-            self.model.write_model(self.model_description_file)
+            self.run_logger.warning("[WARNING] Model description output not implemented yet")
+            # self.model.write_model(self.model_description_file)
 
         ### Initialize time
         self.elapsed_time = 0.0
 
         ### Initialize logging
         ### None: default logging, 0: no logging
+        # if self.log_frequency is None:
+        #     if self.model.target_focal_area_lineages:
+        #         default_log_frequency = 1
+        #     else:
+        #         default_log_frequency = self.model.max_time/100
+        # if self.log_frequency:
+        #     if self.model.target_focal_area_lineages:
+        #         last_logged_num_tips = 0
+        #     else:
+        #         last_logged_time = 0.0
+
         if self.log_frequency is None:
-            if self.model.target_focal_area_lineages:
-                default_log_frequency = 1
-            else:
-                default_log_frequency = self.model.max_time/100
+            default_log_frequency = self.model.max_time/100
         if self.log_frequency:
-            if self.model.target_focal_area_lineages:
-                last_logged_num_tips = 0
-            else:
-                last_logged_time = 0.0
+            last_logged_time = 0.0
 
         ### Initialize debugging
         if self.debug_mode:
@@ -233,10 +223,7 @@ class InphestSimulator(object):
             if self.model.max_time and self.elapsed_time > self.model.max_time:
                 self.elapsed_time = self.model.max_time
                 self.run_logger.info("Termination condition of t = {} reached: storing results and terminating".format(self.elapsed_time))
-                self.store_sample(
-                    focal_areas_tree_out=self.focal_areas_trees_file,
-                    all_areas_tree_out=self.all_areas_trees_file,
-                    )
+                self.store_sample(trees_file=self.trees_file)
                 break
             for lineage in self.phylogeny.iterate_current_lineages():
                 lineage.edge.length += time_till_event
@@ -262,20 +249,18 @@ class InphestSimulator(object):
 
             ntips_in_focal_areas = self.phylogeny.num_focal_area_lineages()
             ntips = len(self.phylogeny.current_lineages)
-            if self.model.gsa_termination_focal_area_lineages and ntips_in_focal_areas >= self.model.gsa_termination_focal_area_lineages:
-                # select/process one of the previously stored snapshots, write to final results file,
-                # and then break
-                raise NotImplementedError
-            elif self.model.gsa_termination_focal_area_lineages and ntips_in_focal_areas == self.target_focal_area_lineages:
-                # store snapshot in log, but do not break
-                raise NotImplementedError
-            elif self.model.target_focal_area_lineages and ntips_in_focal_areas >= self.model.target_focal_area_lineages:
-                self.run_logger.info("Termination condition of {} lineages in focal areas reached at t = {}: storing results and terminating".format(self.model.target_focal_area_lineages, self.elapsed_time))
-                self.store_sample(
-                    focal_areas_tree_out=self.focal_areas_trees_file,
-                    all_areas_tree_out=self.all_areas_trees_file,
-                    )
-                break
+
+            # if self.model.gsa_termination_focal_area_lineages and ntips_in_focal_areas >= self.model.gsa_termination_focal_area_lineages:
+            #     # select/process one of the previously stored snapshots, write to final results file,
+            #     # and then break
+            #     raise NotImplementedError
+            # elif self.model.gsa_termination_focal_area_lineages and ntips_in_focal_areas == self.target_focal_area_lineages:
+            #     # store snapshot in log, but do not break
+            #     raise NotImplementedError
+            # elif self.model.target_focal_area_lineages and ntips_in_focal_areas >= self.model.target_focal_area_lineages:
+            #     self.run_logger.info("Termination condition of {} lineages in focal areas reached at t = {}: storing results and terminating".format(self.model.target_focal_area_lineages, self.elapsed_time))
+            #     self.store_sample(trees_file=self.trees_file)
+            #     break
 
     def schedule_events(self):
         event_calls = []
@@ -487,10 +472,6 @@ def repeat_run(
         run_logger.info("-inphest- Using existing RNG: {}".format(config_d["rng"]))
     if config_d.get("store_trees", True) and "trees_file" not in config_d:
         config_d["trees_file"] = open(InphestSimulator.compose_trees_filepath(output_prefix), "w")
-    # if config_d.get("store_focal_areas_trees", True) and "focal_areas_trees_file" not in config_d:
-    #     config_d["focal_areas_trees_file"] = open(InphestSimulator.compose_focal_areas_trees_filepath(output_prefix), "w")
-    # if config_d.get("store_all_areas_trees", True) and "all_areas_trees_file" not in config_d:
-    #     config_d["all_areas_trees_file"] = open(InphestSimulator.compose_all_areas_trees_filepath(output_prefix), "w")
 
     host_regime_samples_path = os.path.normpath(host_regime_samples_path)
     run_logger.info("-inphest- Using host biogeographical regime samples from: {}".format(host_regime_samples_path))
