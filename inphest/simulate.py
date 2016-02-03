@@ -185,8 +185,8 @@ class InphestSimulator(object):
             num_events = 0
 
         ### Initialize termination conditiong checking
-        ntips_in_focal_areas = self.phylogeny.num_focal_area_lineages()
-        ntips = len(self.phylogeny.current_lineages)
+        # ntips_in_focal_areas = self.phylogeny.num_focal_area_lineages()
+        # ntips = len(self.phylogeny.current_lineages)
 
         while True:
 
@@ -273,30 +273,30 @@ class InphestSimulator(object):
 
         for lineage in self.phylogeny.iterate_current_lineages():
             # speciation
-            speciation_rate = self.model.lineage_birth_rate_function(lineage)
+            speciation_rate = self.model.symbiont_lineage_birth_rate_function(lineage)
             if speciation_rate:
                 event_calls.append( (self.phylogeny.split_lineage, lineage) )
                 event_rates.append(speciation_rate)
             # extinction
-            extinction_rate = self.model.lineage_death_rate_function(lineage)
+            extinction_rate = self.model.symbiont_lineage_death_rate_function(lineage)
             if extinction_rate:
                 event_calls.append( (self.phylogeny.extinguish_lineage, lineage) )
                 event_rates.append(extinction_rate)
-            # extinction
+            # anagenetic host gain
+            host_gain_rate = self.model.symbiont_lineage_host_gain_rate_function(lineage)
+            if host_gain_rate:
+                event_calls.append( (self.phylogeny.expand_lineage_host_set, lineage) )
+                event_rates.append(host_gain_rate)
+            # anagenetic host loss
+            host_loss_rate = self.model.symbiont_lineage_host_loss_rate_function(lineage)
+            if host_loss_rate:
+                event_calls.append( (self.phylogeny.contract_lineage_host_set, lineage) )
+                event_rates.append(host_loss_rate)
+            # anagenetic area loss
             area_loss_rate = self.model.lineage_area_loss_rate_function(lineage)
             if area_loss_rate:
-                event_calls.append( (self.phylogeny.contract_lineage_range, lineage) )
+                event_calls.append( (self.phylogeny.contract_lineage_area_set, lineage) )
                 event_rates.append(area_loss_rate)
-            # trait evolution
-            for trait_idx, current_state_idx in enumerate(lineage.traits_vector):
-                ## normalized
-                for proposed_state_idx in range(self.model.trait_types[trait_idx].nstates):
-                    if proposed_state_idx == current_state_idx:
-                        continue
-                    trait_transition_rate = self.model.trait_types[trait_idx].transition_rate_matrix[current_state_idx][proposed_state_idx]
-                    if trait_transition_rate:
-                        event_calls.append( (self.phylogeny.evolve_trait, lineage, trait_idx, proposed_state_idx) )
-                        event_rates.append(trait_transition_rate)
             # dispersal
             lineage_area_gain_rate = self.model.lineage_area_gain_rate_function(lineage)
             if not lineage_area_gain_rate:

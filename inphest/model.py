@@ -383,7 +383,7 @@ class HostSystem(object):
         ## TODO: if we hit this often, we need to construct a look-up table
         lineages = set()
         for host in self.host_lineages_by_id.values():
-            if host.start_time >= current_time and host.end_time < current_time:
+            if host.start_time <= current_time and host.end_time > current_time:
                 lineages.add(host)
         return lineages
 
@@ -418,11 +418,12 @@ class SymbiontHostAreaDistributionMatrix(object):
         If ``area_idx`` is specified, then only the host in a specific area is infected.
         Otherwise, all hosts (of the given lineage) in all areas are infected.
         """
+        assert len(host_lineage.current_distribution) <= self.host_system.num_areas
         if area_idx is None:
-            for area_idx, area_value in host_lineage.current_distribution:
-                assert False
-                self._distribution_matrix[host_lineage.lineage_id][area_idx] = 1
-                self._area_idx_occurences[area_idx] += 1
+            for area_idx, area_value in enumerate(host_lineage.current_distribution):
+                if area_value:
+                    self._distribution_matrix[host_lineage.lineage_id][area_idx] = 1
+                    self._area_idx_occurences[area_idx] += 1
         else:
             assert host_lineage.current_distribution[area_idx] == 1
             self._distribution_matrix[host_lineage.lineage_id][area_idx] = 1
@@ -435,8 +436,10 @@ class SymbiontHostAreaDistributionMatrix(object):
         If ``area_idx`` is specified, then only the host in that specific area is removed. Otherwise,
         Otherwise, all hosts (of the given lineage) of all areas are removed from the range.
         """
+        assert len(host_lineage.current_distribution) <= self.host_system.num_areas
         if area_idx is None:
-            for area_idx in range(self._distribution_matrix[host_lineage.lineage_id]):
+            # for area_idx in range(self._distribution_matrix[host_lineage.lineage_id]):
+            for area_idx, area_value in enumerate(host_lineage.current_distribution):
                 self._distribution_matrix[host_lineage.lineage_id][area_idx] = 0
                 self._area_idx_occurences[area_idx] -= 1
         else:
@@ -521,7 +524,7 @@ class Phylogeny(dendropy.Tree):
         dm = self.new_symbiont_distribution_matrix()
         extant_host_lineages = self.model.host_system.extant_host_lineages_at_current_time(0)
         for host_lineage in extant_host_lineages:
-            dm.add_host(host_lineage_id=host_lineage.lineage_id)
+            dm.add_host(host_lineage=host_lineage)
 
     def iterate_current_lineages(self):
         for lineage in self.current_lineages:
@@ -668,41 +671,41 @@ class Phylogeny(dendropy.Tree):
         # self.run_logger.info("Total extinction: {}".format(msg))
         raise error.TotalExtinctionException(msg)
 
-    def evolve_trait(self, lineage, trait_idx, state_idx):
-        lineage.traits_vector[trait_idx] = state_idx
+    # def evolve_trait(self, lineage, trait_idx, state_idx):
+    #     lineage.traits_vector[trait_idx] = state_idx
 
     def disperse_lineage(self, lineage, dest_area_idx):
         lineage.distribution_vector[dest_area_idx] = 1
 
-    def focal_area_lineages(self):
-        focal_area_lineages = set()
-        for lineage in self.iterate_current_lineages():
-            for area_idx in self.model.geography.focal_area_indexes:
-                if lineage.distribution_vector[area_idx] == 1:
-                    focal_area_lineages.add(lineage)
-                    break
-        return focal_area_lineages
+    # def focal_area_lineages(self):
+    #     focal_area_lineages = set()
+    #     for lineage in self.iterate_current_lineages():
+    #         for area_idx in self.model.geography.focal_area_indexes:
+    #             if lineage.distribution_vector[area_idx] == 1:
+    #                 focal_area_lineages.add(lineage)
+    #                 break
+    #     return focal_area_lineages
 
-    def num_focal_area_lineages(self):
-        count = 0
-        for lineage in self.iterate_current_lineages():
-            for area_idx in self.model.geography.focal_area_indexes:
-                if lineage.distribution_vector[area_idx] == 1:
-                    count += 1
-                    break
-        return count
+    # def num_focal_area_lineages(self):
+    #     count = 0
+    #     for lineage in self.iterate_current_lineages():
+    #         for area_idx in self.model.geography.focal_area_indexes:
+    #             if lineage.distribution_vector[area_idx] == 1:
+    #                 count += 1
+    #                 break
+    #     return count
 
-    def extract_focal_areas_tree(self):
-        # tcopy = Phylogeny(self)
-        tcopy = copy.deepcopy(self)
-        focal_area_lineages = tcopy.focal_area_lineages()
-        if len(focal_area_lineages) < 2:
-            raise error.InsufficientFocalAreaLineagesSimulationException("insufficient lineages in focal area at termination".format(len(focal_area_lineages)))
-        try:
-            tcopy.filter_leaf_nodes(filter_fn=lambda x: x in focal_area_lineages)
-        except dendropy.SeedNodeDeletionException:
-            raise error.InsufficientFocalAreaLineagesSimulationException("no extant lineages in focal area at termination".format(len(focal_area_lineages)))
-        return tcopy
+    # def extract_focal_areas_tree(self):
+    #     # tcopy = Phylogeny(self)
+    #     tcopy = copy.deepcopy(self)
+    #     focal_area_lineages = tcopy.focal_area_lineages()
+    #     if len(focal_area_lineages) < 2:
+    #         raise error.InsufficientFocalAreaLineagesSimulationException("insufficient lineages in focal area at termination".format(len(focal_area_lineages)))
+    #     try:
+    #         tcopy.filter_leaf_nodes(filter_fn=lambda x: x in focal_area_lineages)
+    #     except dendropy.SeedNodeDeletionException:
+    #         raise error.InsufficientFocalAreaLineagesSimulationException("no extant lineages in focal area at termination".format(len(focal_area_lineages)))
+    #     return tcopy
 
 class InphestModel(object):
 
