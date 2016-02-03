@@ -55,12 +55,11 @@ class RevBayesBiogeographyParser(object):
     def __init__(self, taxon_namespace=None):
         ## information on each tree in sample
         self.tree_entries = []
-        ## events organized by tree
-        self.event_schedules_by_tree = []
+        ## events organized
+        self.event_schedules_across_all_trees = []
+        self.event_schedules_by_tree = {}
         ## information on each bipartition across all samples
         self.edge_entries = []
-        ## events organized by bipartition
-        self.event_schedules_by_edge = collections.defaultdict(dendropy.Bipartition)
         ## track deepest event on tree
         self.max_event_times = {}
         ### taxon management
@@ -105,20 +104,30 @@ class RevBayesBiogeographyParser(object):
             tree.calc_node_ages(ultrametricity_precision=0.01)
             tree_entry["seed_node_age"] = tree.seed_node.age
             # print(tree.seed_node.age)
+
             for nd in tree:
                 edge_entry = {}
                 edge_entry["tree_idx"] = tree_idx
                 edge_entry["edge_id"] = int(nd.edge.bipartition)
                 edge_entry["split_bitstring"] = nd.edge.bipartition.split_as_bitstring()
                 edge_entry["leafset_bitstring"] = nd.edge.bipartition.leafset_as_bitstring()
-                edge_entry["edge_duration"] = nd.edge.length
-                edge_entry["edge_ending_age"] = nd.age
+
                 if nd.parent_node:
-                    edge_entry["edge_starting_age"] = nd.parent_node.age
+                    nd.time = nd.parent_node.time + nd.edge.length
+                    edge_entry["edge_start_time"] = nd.parent_node.time
                 else:
-                    # special case for root
-                    edge_entry["edge_starting_age"] = 0.0
-                    edge_entry["edge_duration"] = nd.age
+                    nd.time = 0.0
+                    edge_entry["edge_start_time"] = -1.0
+                edge_entry["edge_duration"] = nd.edge.length
+                edge_entry["edge_end_time"] = nd.time
+                # edge_entry["edge_duration"] = nd.edge.length
+                # edge_entry["edge_ending_age"] = nd.age
+                # if nd.parent_node:
+                #     edge_entry["edge_starting_age"] = nd.parent_node.age
+                # else:
+                #     # special case for root
+                #     edge_entry["edge_starting_age"] = 0.0
+                #     edge_entry["edge_duration"] = nd.age
                 if nd.is_leaf():
                     edge_entry["child0_edge_id"] = RevBayesBiogeographyParser.NULL_VALUE
                     edge_entry["child1_edge_id"] = RevBayesBiogeographyParser.NULL_VALUE
@@ -143,37 +152,70 @@ class RevBayesBiogeographyParser(object):
                 else:
                     edge_entry["edge_cladogenetic_speciation_mode"] = RevBayesBiogeographyParser.NULL_VALUE
                 self.edge_entries.append(edge_entry)
+                _debug_edge_events = []
                 for event in edge_events:
                     event_entry = {}
                     event_entry["tree_idx"] = edge_entry["tree_idx"]
                     event_entry["edge_id"] = edge_entry["edge_id"]
-                    event_entry["age"] = event["age"]
-                    try:
-                        self.max_event_times[tree_idx] = max(event_entry["age"], self.max_event_times[tree_idx])
-                    except KeyError:
-                        self.max_event_times[tree_idx] = event_entry["age"]
-                    # event_entry["time"] = event["time"]
-                    event_entry["event_type"] = "anagenesis"
-                    if event["to_state"] == "1":
-                        event_entry["event_subtype"] = "area_gain"
-                    elif event["to_state"] == "0":
-                        event_entry["event_subtype"] = "area_loss"
+
+                    # Michael Lands, pers. comm., 2015-11-11:
+                    # "Yes, "a" is absolute time since the present, but "t" is
+                    # the relative unit position along that particular branch
+                    # (0 is parent-side, 1 is child-side). You can always
+                    # deduce "t" from "a", but it's there for convenience. "
+
+                    if not nd.parent_node:
+                        ## we ignore all events in edge subtending root
+                        pass
                     else:
-                        raise ValueError("Unexpected value for state: expecting '0' or '1' but found '{}'".format(event["to_state"]))
-                    event_entry["area_idx"] = event["area_idx"]
-                    # event_entry["to_state"] = event["to_state"]
-                    self.event_schedules_by_tree.append(event_entry)
+                        event_time1 = nd.parent_node.time + (nd.edge.length - (event["age"] - nd.age))
+                        event_time2 = nd.parent_node.time + (event["time"] * nd.edge.length)
+                        assert (event_time1 - event_time2) <= 1e-2, "{} != {}".format(event_time1, event_time2)
+                        event_entry["time"] = event_time1
+
+                        try:
+                            self.max_event_times[tree_idx] = max(event_entry["time"], self.max_event_times[tree_idx])
+                        except KeyError:
+                            self.max_event_times[tree_idx] = event_entry["time"]
+                        event_entry["event_type"] = "anagenesis"
+                        if event["to_state"] == "1":
+                            event_entry["event_subtype"] = "area_gain"
+                        elif event["to_state"] == "0":
+                            event_entry["event_subtype"] = "area_loss"
+                        else:
+                            raise ValueError("Unexpected value for state: expecting '0' or '1' but found '{}'".format(event["to_state"]))
+                        event_entry["area_idx"] = event["area_idx"]
+                        # event_entry["to_state"] = event["to_state"]
+                        self.event_schedules_across_all_trees.append(event_entry)
+                        try:
+                            self.event_schedules_by_tree[tree].append(event_entry)
+                        except KeyError:
+                            self.event_schedules_by_tree[tree] = [event_entry]
+                        _debug_edge_events.append(event_entry)
+
                 ## handle splitting event
                 if not nd.is_leaf():
-                    self.event_schedules_by_tree.append({
+                    split_event = {
                         "tree_idx": edge_entry["tree_idx"],
                         "edge_id": edge_entry["edge_id"],
-                        "age": edge_entry["edge_ending_age"],
+                        "time": edge_entry["edge_end_time"],
                         "event_type": "cladogenesis",
                         "event_subtype": edge_entry["edge_cladogenetic_speciation_mode"],
                         "child0_edge_id": edge_entry["child0_edge_id"],
                         "child1_edge_id": edge_entry["child1_edge_id"],
-                            })
+                            }
+                    self.event_schedules_across_all_trees.append(split_event)
+                    try:
+                        self.event_schedules_by_tree[tree].append(split_event)
+                    except KeyError:
+                        self.event_schedules_by_tree[tree] = [split_event]
+                    _debug_edge_events.append(split_event)
+
+                # print("--- edge: {} ---".format(nd.edge.bipartition.leafset_as_bitstring()))
+                # print("times: {} to {}".format(edge_entry["edge_start_time"], edge_entry["edge_end_time"]))
+                # _debug_edge_events.sort(key=lambda e: e["time"])
+                # event_times = [e["time"] for e in _debug_edge_events]
+                # print("event times: {}".format(event_times))
 
     def _extract_comment_metadata(self, nd):
 
@@ -287,7 +329,7 @@ class RevBayesBiogeographyParser(object):
                 lineterminator=os.linesep,
                 )
         writer.writeheader()
-        writer.writerows(self.event_schedules_by_tree)
+        writer.writerows(self.event_schedules_across_all_trees)
         events_by_treef.close()
 
 

@@ -176,6 +176,32 @@ class RateFunction(object):
         d["description"] = self.description
         return d
 
+class HostDistributionVector(StatesVector):
+
+    @classmethod
+    def from_string(cls, s):
+        num_areas = len(s)
+        values = [int(i) for i in s]
+        return cls(num_areas=num_areas, values=values)
+
+    def __init__(self, num_areas, values=None):
+        StatesVector.__init__(self,
+                nchar=num_areas,
+                nstates=[2] * num_areas,
+                values=values,
+                )
+
+    def presences(self):
+        """
+        Returns list of indexes in which lineage is present.
+        """
+        return [idx for idx, s in enumerate(self._states) if s == 1]
+
+    def clone(self):
+        s = self.__class__(num_areas=self._nchar)
+        s._states = list(self._states)
+        return s
+
 class HostRegime(object):
     """
     A particular host history on which the symbiont history is conditioned.
@@ -201,32 +227,6 @@ class HostRegime(object):
         "child0_lineage_id",        #   split/edge id of first daughter (cladogenesis)
         "child1_lineage_id",        #   split/edge id of second daughter (cladogenesis)
         ])
-
-    class HostDistributionVector(StatesVector):
-
-        @classmethod
-        def from_string(cls, s):
-            num_areas = len(s)
-            values = [int(i) for i in s]
-            return cls(num_areas=num_areas, values=values)
-
-        def __init__(self, num_areas, values=None):
-            StatesVector.__init__(self,
-                    nchar=num_areas,
-                    nstates=[2] * num_areas,
-                    values=values,
-                    )
-
-        def presences(self):
-            """
-            Returns list of indexes in which lineage is present.
-            """
-            return [idx for idx, s in enumerate(self._states) if s == 1]
-
-        def clone(self):
-            s = self.__class__(num_areas=self._nchar)
-            s._states = list(self._states)
-            return s
 
     def __init__(self, taxon_namespace=None,):
         if taxon_namespace is None:
@@ -280,25 +280,26 @@ class HostRegimeSamples(object):
             lineage = HostRegime.HostRegimeLineageDefinition(
                     # tree_idx=edge_entry["tree_idx"],
                     lineage_id=lineage_id,
-                    lineage_start_time=edge_entry["edge_starting_age"],
-                    lineage_end_time=edge_entry["edge_ending_age"],
-                    lineage_start_distribution=HostRegime.HostDistributionVector.from_string(edge_entry["edge_starting_state"]),
-                    lineage_end_distribution=HostRegime.HostDistributionVector.from_string(edge_entry["edge_ending_state"]),
+                    lineage_start_time=edge_entry["edge_start_time"],
+                    lineage_end_time=edge_entry["edge_end_time"],
+                    lineage_start_distribution=HostDistributionVector.from_string(edge_entry["edge_starting_state"]),
+                    lineage_end_distribution=HostDistributionVector.from_string(edge_entry["edge_ending_state"]),
                     )
             assert lineage.lineage_id not in tree_host_regimes[tree_idx].lineages
+            assert lineage.lineage_start_time <= lineage.lineage_end_time, "{}, {}".format(lineage.lineage_start_time, lineage.lineage_end_time)
             tree_host_regimes[tree_idx].lineages[lineage_id] = lineage
             # try:
             #     tree_root_heights[tree_idx] = max(edge_entry["edge_ending_age"], tree_root_heights[tree_idx])
             # except KeyError:
             #     tree_root_heights[tree_idx] = edge_entry["edge_ending_age"]
 
-        for event_entry in rb.event_schedules_by_tree:
+        for event_entry in rb.event_schedules_across_all_trees:
             tree_idx = event_entry["tree_idx"]
             if tree_idx not in tree_host_regimes:
                 tree_host_regimes[tree_idx] = HostRegime(taxon_namespace=self.taxon_namespace)
             event = HostRegime.HostEvent(
                 # tree_idx=event_entry["tree_idx"],
-                event_time=event_entry["age"],
+                event_time=event_entry["time"],
                 # weight=self.tree_probabilities[event_entry["tree_idx"]],
                 weight=1.0,
                 lineage_id=event_entry["edge_id"],
@@ -346,6 +347,7 @@ class HostSystem(object):
             self.end_time = host_regime_lineage_definition.lineage_end_time
             self.start_distribution = host_regime_lineage_definition.lineage_start_distribution
             self.end_distribution = host_regime_lineage_definition.lineage_end_distribution
+            self.current_distribution = self.start_distribution.clone()
 
     def __init__(self, host_regime):
         self.compile(host_regime)
@@ -410,46 +412,48 @@ class SymbiontHostAreaDistributionMatrix(object):
         ## For quick look-up if host is infected
         self._infected_hosts = set()
 
-    def add_host(self, host_lineage_id, area_idx=None):
+    def add_host(self, host_lineage, area_idx=None):
         """
         Adds a host to the distribution.
         If ``area_idx`` is specified, then only the host in a specific area is infected.
         Otherwise, all hosts (of the given lineage) in all areas are infected.
         """
         if area_idx is None:
-            for area_idx in range(self._distribution_matrix[host_lineage_id]):
-                self._distribution_matrix[host_lineage_id][area_idx] = 1
+            for area_idx, area_value in host_lineage.current_distribution:
+                assert False
+                self._distribution_matrix[host_lineage.lineage_id][area_idx] = 1
                 self._area_idx_occurences[area_idx] += 1
         else:
-            self._distribution_matrix[host_lineage_id][area_idx] = 1
+            assert host_lineage.current_distribution[area_idx] == 1
+            self._distribution_matrix[host_lineage.lineage_id][area_idx] = 1
             self._area_idx_occurences[area_idx] += 1
-        self._infected_hosts.add(host_lineage_id)
+        self._infected_hosts.add(host_lineage.lineage_id)
 
-    def remove_host(self, host_lineage_id, area_idx=None):
+    def remove_host(self, host_lineage, area_idx=None):
         """
         Removes a host from the distribution.
         If ``area_idx`` is specified, then only the host in that specific area is removed. Otherwise,
         Otherwise, all hosts (of the given lineage) of all areas are removed from the range.
         """
         if area_idx is None:
-            for area_idx in range(self._distribution_matrix[host_lineage_id]):
-                self._distribution_matrix[host_lineage_id][area_idx] = 0
+            for area_idx in range(self._distribution_matrix[host_lineage.lineage_id]):
+                self._distribution_matrix[host_lineage.lineage_id][area_idx] = 0
                 self._area_idx_occurences[area_idx] -= 1
         else:
-            self._distribution_matrix[host_lineage_id][area_idx] = 1
+            self._distribution_matrix[host_lineage.lineage_id][area_idx] = 1
             self._area_idx_occurences[area_idx] -= 1
-        self._infected_hosts.remove(host_lineage_id)
+        self._infected_hosts.remove(host_lineage.lineage_id)
 
-    def has_host(self, host_lineage_id, area_idx=None):
+    def has_host(self, host_lineage, area_idx=None):
         """
         Returns True if host is infected with this parasite, False otherwise.
         If ``area_idx`` is specified then only the host in that area is checked.
         Otherwise, if the host is infected in *any* of its areas, returns True.
         """
         if area_idx is None:
-            return host_lineage_id in self._infected_hosts
+            return host_lineage.lineage_id in self._infected_hosts
         else:
-            return self._distribution_matrix[host_lineage_id][area_idx] == 1
+            return self._distribution_matrix[host_lineage.lineage_id][area_idx] == 1
 
     def has_area(self, area_idx):
         """
