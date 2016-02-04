@@ -181,13 +181,20 @@
         \end{minipage}
 \end{description}
 
-\section{Questions}
+\section{Questions/Issues}
 \begin{itemize}
-    \item
-        Should symbionts/parasites track geography independently of hosts?
+    \item   Events on the very long edge subtending root: ignored. Parasite simulation begins at root node.
+    \item   How to determine initial symbiont lineage host and geographic affinities? See \verb+model.Phylogeny.seed_symbiont_distribution_matrix()+.
+    \item   Anagenetic host gain: Are we modeling this as host switching or host addition?
+    \item   Anagenetic host gain: Is probability of host gain sum of probability of ``dispersing'' to new host from existing hosts, or is rate of host gain absolute (i.e., independent of the number of hosts already occupied)?
+    \item   Anagenetic host gain: Need to separately model host availability/gain in each area?
 
-        If so, then symbionts will still not be able to disperse areas with no suitable hosts, but rather symbiont range would be restricted to a subset of the host range.
-        Each host lineage would probably need to be modeled independently in each area wrt to parasite load; each parasite would track not so much host lineages per se, but hosts in specific areas.
+\end{itemize}
+
+\section{Tests Required}
+\begin{itemize}
+    \item Parsing of BayAreas file.
+    \item Correct construction of  host regime event schedule.
 
 \end{itemize}
 
