@@ -60,7 +60,7 @@ class InphestSimulator(object):
         self.model = inphest_model
 
         # initialize phylogeny
-        self.phylogeny = model.Phylogeny(
+        self.phylogeny = model.SymbiontPhylogeny(
                 model=self.model,
                 rng=self.rng,
                 debug_mode=self.debug_mode,
@@ -283,24 +283,35 @@ class InphestSimulator(object):
                 event_calls.append( (self.phylogeny.extinguish_lineage, lineage) )
                 event_rates.append(extinction_rate)
             # anagenetic host gain
-            host_gain_rate = self.model.symbiont_lineage_host_gain_rate_function(lineage)
-            if host_gain_rate:
-                event_calls.append( (self.phylogeny.expand_lineage_host_set, lineage) )
-                event_rates.append(host_gain_rate)
+            ## TODO!
+            ##      get set of areas in which parasite currently occurs
+            ##      for each area, a:
+            ##          get set of hosts in area, H(a)
+            ##          out of this,
+            ##              get set of hosts already associated with parasite P(h=1, h \in H(a))
+            ##              get set of hosts not with parasite P(h=0, h \in H(a))
+            ##          for each host in area not associated with parasite,
+            ##              calculate transmission probability as sum of being infected by any other host
+            ##              add event
+            # host_gain_rate = self.model.symbiont_lineage_host_gain_rate_function(lineage)
+            # if host_gain_rate:
+            #     event_calls.append( (self.phylogeny.expand_lineage_host_set, lineage) )
+            #     event_rates.append(host_gain_rate)
             # anagenetic host loss
             host_loss_rate = self.model.symbiont_lineage_host_loss_rate_function(lineage)
             if host_loss_rate:
                 event_calls.append( (self.phylogeny.contract_lineage_host_set, lineage) )
                 event_rates.append(host_loss_rate)
-            # anagenetic area loss
-            area_loss_rate = self.model.lineage_area_loss_rate_function(lineage)
-            if area_loss_rate:
-                event_calls.append( (self.phylogeny.contract_lineage_area_set, lineage) )
-                event_rates.append(area_loss_rate)
             # dispersal
             lineage_area_gain_rate = self.model.lineage_area_gain_rate_function(lineage)
             if not lineage_area_gain_rate:
                 continue
+            # anagenetic area gain
+
+            ## TODO!
+            ## for each host, check to see if any unoccupied areas;
+            ## then see what the total probability of dispersing to that area (i.e., summing up over all source areas of the host)
+
             for dest_area_idx in self.model.geography.area_indexes:
                 if lineage.distribution_vector[dest_area_idx]:
                     # already occurs here: do we model it or not?
@@ -315,56 +326,62 @@ class InphestSimulator(object):
                 if sum_of_area_connection_weights_to_dest:
                     event_calls.append( (self.phylogeny.disperse_lineage, lineage, dest_area_idx) )
                     event_rates.append(sum_of_area_connection_weights_to_dest)
+
+            # anagenetic area loss
+            area_loss_rate = self.model.lineage_area_loss_rate_function(lineage)
+            if area_loss_rate:
+                event_calls.append( (self.phylogeny.contract_lineage_area_set, lineage) )
+                event_rates.append(area_loss_rate)
         # sum_of_event_rates = sum(event_rates)
         return event_calls, event_rates
 
-    def store_sample(self, focal_areas_tree_out, all_areas_tree_out):
-        if focal_areas_tree_out is not None:
-            focal_areas_tree = self.phylogeny.extract_focal_areas_tree()
-            n = len(focal_areas_tree.seed_node._child_nodes)
-            if n < 2:
-                raise error.InsufficientFocalAreaLineagesSimulationException("Insufficient lineages in focal area: {}".format(n))
-            self.write_focal_areas_tree(
-                    out=focal_areas_tree_out,
-                    tree=focal_areas_tree,
-                    )
-        if all_areas_tree_out is not None:
-            self.write_all_areas_tree(
-                    out=all_areas_tree_out,
-                    tree=self.phylogeny,
-                    )
+    # def store_sample(self, focal_areas_tree_out, all_areas_tree_out):
+    #     if focal_areas_tree_out is not None:
+    #         focal_areas_tree = self.phylogeny.extract_focal_areas_tree()
+    #         n = len(focal_areas_tree.seed_node._child_nodes)
+    #         if n < 2:
+    #             raise error.InsufficientFocalAreaLineagesSimulationException("Insufficient lineages in focal area: {}".format(n))
+    #         self.write_focal_areas_tree(
+    #                 out=focal_areas_tree_out,
+    #                 tree=focal_areas_tree,
+    #                 )
+    #     if all_areas_tree_out is not None:
+    #         self.write_all_areas_tree(
+    #                 out=all_areas_tree_out,
+    #                 tree=self.phylogeny,
+    #                 )
 
-    def write_focal_areas_tree(self, out, tree):
-        if self.is_encode_nodes:
-            labelf = lambda x: self.model.encode_lineage(x,
-                    set_label=False,
-                    add_annotation=self.is_annotate_nodes,
-                    exclude_supplemental_areas=True)
-        else:
-            labelf = InphestSimulator.simple_node_label_function
-        tree.write_to_stream(
-                out,
-                schema="newick",
-                suppress_annotations=False,
-                node_label_compose_fn=labelf,
-                suppress_internal_node_labels=self.is_suppress_internal_node_labels,
-                )
+    # def write_focal_areas_tree(self, out, tree):
+    #     if self.is_encode_nodes:
+    #         labelf = lambda x: self.model.encode_lineage(x,
+    #                 set_label=False,
+    #                 add_annotation=self.is_annotate_nodes,
+    #                 exclude_supplemental_areas=True)
+    #     else:
+    #         labelf = InphestSimulator.simple_node_label_function
+    #     tree.write_to_stream(
+    #             out,
+    #             schema="newick",
+    #             suppress_annotations=False,
+    #             node_label_compose_fn=labelf,
+    #             suppress_internal_node_labels=self.is_suppress_internal_node_labels,
+    #             )
 
-    def write_all_areas_tree(self, out, tree):
-        if self.is_encode_nodes:
-            labelf = lambda x: self.model.encode_lineage(x,
-                    set_label=False,
-                    add_annotation=self.is_annotate_nodes,
-                    exclude_supplemental_areas=False)
-        else:
-            labelf = InphestSimulator.simple_node_label_function
-        tree.write_to_stream(
-                out,
-                schema="newick",
-                suppress_annotations=False,
-                node_label_compose_fn=labelf,
-                suppress_internal_node_labels=self.is_suppress_internal_node_labels,
-                )
+    # def write_all_areas_tree(self, out, tree):
+    #     if self.is_encode_nodes:
+    #         labelf = lambda x: self.model.encode_lineage(x,
+    #                 set_label=False,
+    #                 add_annotation=self.is_annotate_nodes,
+    #                 exclude_supplemental_areas=False)
+    #     else:
+    #         labelf = InphestSimulator.simple_node_label_function
+    #     tree.write_to_stream(
+    #             out,
+    #             schema="newick",
+    #             suppress_annotations=False,
+    #             node_label_compose_fn=labelf,
+    #             suppress_internal_node_labels=self.is_suppress_internal_node_labels,
+    #             )
 
     def debug_compose_tree(self, tree):
         labelf = lambda x: self.model.encode_lineage(x,

@@ -176,32 +176,6 @@ class RateFunction(object):
         d["description"] = self.description
         return d
 
-class HostDistributionVector(StatesVector):
-
-    @classmethod
-    def from_string(cls, s):
-        num_areas = len(s)
-        values = [int(i) for i in s]
-        return cls(num_areas=num_areas, values=values)
-
-    def __init__(self, num_areas, values=None):
-        StatesVector.__init__(self,
-                nchar=num_areas,
-                nstates=[2] * num_areas,
-                values=values,
-                )
-
-    def presences(self):
-        """
-        Returns list of indexes in which lineage is present.
-        """
-        return [idx for idx, s in enumerate(self._states) if s == 1]
-
-    def clone(self):
-        s = self.__class__(num_areas=self._nchar)
-        s._states = list(self._states)
-        return s
-
 class HostRegime(object):
     """
     A particular host history on which the symbiont history is conditioned.
@@ -212,8 +186,8 @@ class HostRegime(object):
         "lineage_id",               #   lineage (edge/split) id on which event occurs
         "lineage_start_time",          # time lineage appears
         "lineage_end_time",            # time lineage ends
-        "lineage_start_distribution",  #   distribution/range (area set) at beginning of lineage
-        "lineage_end_distribution",    #   distribution/range (area set) at end of lineage
+        "lineage_start_distribution_bitstring",  #   distribution/range (area set) at beginning of lineage
+        "lineage_end_distribution_bitstring",    #   distribution/range (area set) at end of lineage
     ])
 
     HostEvent = collections.namedtuple("HostEvent", [
@@ -282,8 +256,8 @@ class HostRegimeSamples(object):
                     lineage_id=lineage_id,
                     lineage_start_time=edge_entry["edge_start_time"],
                     lineage_end_time=edge_entry["edge_end_time"],
-                    lineage_start_distribution=HostDistributionVector.from_string(edge_entry["edge_starting_state"]),
-                    lineage_end_distribution=HostDistributionVector.from_string(edge_entry["edge_ending_state"]),
+                    lineage_start_distribution_bitstring=edge_entry["edge_starting_state"],
+                    lineage_end_distribution_bitstring=edge_entry["edge_ending_state"],
                     )
             assert lineage.lineage_id not in tree_host_regimes[tree_idx].lineages
             assert lineage.lineage_start_time <= lineage.lineage_end_time, "{}, {}".format(lineage.lineage_start_time, lineage.lineage_end_time)
@@ -323,31 +297,64 @@ class HostRegimeSamples(object):
 
 class HostSystem(object):
     """
-    Models the host system, as defined by a HostRegime, for a particular simulation replicate.
+    Models the the collection of hosts for a particular simulation replicate,
+    based on a HostRegime. The HostRegime provides the basic invariant
+    definitions/rules that apply across all replicates, while the HostSystem
+    tracks state etc. for a single replicate.
     """
 
-    class Area(object):
-
-        """
-        Manages the state of an area during a particular simulation replicate.
-        """
-
-        def __init__(self, area_idx):
-            self.area_idx = area_idx
-
-    class Host(object):
+    class HostLineage(object):
         """
         Manages the state of a host during a particular simulation replicate.
         """
 
-        def __init__(self, host_regime_lineage_definition):
+        def __init__(self,
+                host_regime_lineage_definition,
+                host_system):
             self.host_regime_lineage_definition = host_regime_lineage_definition
+            self.host_system = host_system
             self.lineage_id = host_regime_lineage_definition.lineage_id
             self.start_time = host_regime_lineage_definition.lineage_start_time
             self.end_time = host_regime_lineage_definition.lineage_end_time
-            self.start_distribution = host_regime_lineage_definition.lineage_start_distribution
-            self.end_distribution = host_regime_lineage_definition.lineage_end_distribution
-            self.current_distribution = self.start_distribution.clone()
+            self.start_distribution_bitstring = host_regime_lineage_definition.lineage_start_distribution_bitstring
+            self.end_distribution_bitstring = host_regime_lineage_definition.lineage_end_distribution_bitstring
+            self._current_areas = set()
+            assert len(self.host_system.areas) == len(self.start_distribution_bitstring)
+            for area, presence in zip(self.host_system.areas, self.start_distribution_bitstring):
+                if presence == "1":
+                    self.add_area(area)
+
+        def add_area(self, area):
+            self._current_areas.add(area)
+            area.host_lineages.add(self)
+
+        def remove_area(self, area):
+            self._current_areas.remove(area)
+            area.host_lineages.remove(self)
+
+        def has_area(self, area):
+            return area in self._current_areas
+
+        def current_area_iter(self):
+            for area in self._current_areas:
+                yield area
+
+        # def area_iter(self):
+        #     """
+        #     Iterate over areas in which this host occurs.
+        #     """
+        #     for area_idx in self.current_distribution_bitvector:
+        #         if self.current_distribution_bitvector[area_idx] == 1:
+        #             yield self.host_system.areas[area_idx]
+
+        # def add_area(self, area_idx):
+        #     self.current_distribution_bitvector[area_idx] = 1
+
+        # def remove_area(self, area_idx):
+        #     self.current_distribution_bitvector[area_idx] = 0
+
+        # def has_area(self, area_idx):
+        #     return self.current_distribution_bitvector[area_idx] == 1
 
     def __init__(self, host_regime):
         self.compile(host_regime)
@@ -356,28 +363,37 @@ class HostSystem(object):
         self.host_regime = host_regime
         self.start_time = self.host_regime.start_time
         self.end_time = self.host_regime.end_time
-        self.host_lineages_by_id = {}
         num_areas = None
 
-        # compile lineages
-        for host_regime_lineage_id_definition in self.host_regime.lineages.values():
-            host = HostSystem.Host(host_regime_lineage_id_definition)
-            self.host_lineages_by_id[host.lineage_id] = host
-            if num_areas is None:
-                num_areas = len(host.start_distribution)
-            assert num_areas == len(host.start_distribution)
-            assert num_areas == len(host.end_distribution)
-
         # build areas
+        for host_regime_lineage_id_definition in self.host_regime.lineages.values():
+            if num_areas is None:
+                num_areas = len(host_regime_lineage_id_definition.lineage_start_distribution_bitstring)
+            assert num_areas == len(host_regime_lineage_id_definition.lineage_start_distribution_bitstring)
+            assert num_areas == len(host_regime_lineage_id_definition.lineage_end_distribution_bitstring)
         self.num_areas = num_areas
-        self.areas = {}
+        self.areas = set()
+        self.areas_by_index = {}
         for area_idx in range(self.num_areas):
-            self.areas[area_idx] = HostSystem.Area(area_idx)
-        self.area_host_symbiont_distribution_matrix = {}
-        for area in self.areas:
-            self.area_host_symbiont_distribution_matrix[area] = {}
-            for host_lineage in self.host_lineages_by_id.values():
-                self.area_host_symbiont_distribution_matrix[area][host_lineage] = {}
+            area = Area(area_idx)
+            self.areas.add(area)
+            self.areas_by_index[area_idx] = area
+        # self.area_host_symbiont_host_area_distribution = {}
+        # for area in self.areas:
+        #     self.area_host_symbiont_host_area_distribution[area] = {}
+        #     for host_lineage in self.host_lineages_by_id.values():
+        #         self.area_host_symbiont_host_area_distribution[area][host_lineage] = {}
+
+        # compile lineages
+        self.host_lineages = set()
+        self.host_lineages_by_id = {}
+        for host_regime_lineage_id_definition in self.host_regime.lineages.values():
+            host = HostSystem.HostLineage(
+                    host_regime_lineage_definition=host_regime_lineage_id_definition,
+                    host_system=self,
+                    )
+            self.host_lineages.add(host)
+            self.host_lineages_by_id[host.lineage_id] = host
 
     def extant_host_lineages_at_current_time(self, current_time):
         ## TODO: if we hit this often, we need to construct a look-up table
@@ -387,48 +403,54 @@ class HostSystem(object):
                 lineages.add(host)
         return lineages
 
-class SymbiontHostAreaDistributionMatrix(object):
+class Area(object):
+
+    """
+    Manages the state of an area during a particular simulation replicate.
+    """
+
+    def __init__(self, area_idx):
+        self.area_idx = area_idx
+        self.host_lineages = set()
+        self.symbiont_lineages = set()
+
+class SymbiontHostAreaDistribution(object):
     """
     Manages the host-by-area distribution of a single symbiont lineage.
     """
 
-    def __init__(self, host_system):
+    def __init__(self, symbiont_lineage, host_system):
+        self.symbiont_lineage = symbiont_lineage
         self.host_system = host_system
 
         ## distribution set: tuples of (host_lineage_id, area_idx)
         # self._host_area_distribution = set()
 
         ## distribution matrix: [host_lineage_id][area_idx]
-        self._distribution_matrix = {}
-        for host_lineage_id in self.host_system.host_lineages_by_id:
-            self._distribution_matrix[host_lineage_id] = []
-            for area_idx in range(self.host_system.num_areas):
-                self._distribution_matrix[host_lineage_id].append(0)
-
-        ## For quick look-up if present in an area
-        ## Maintained as a count of hosts in which the parasite occurs in a particular area
-        self._area_idx_occurences = [0 for idx in range(self.host_system.num_areas)]
+        self._host_area_distribution = {}
+        for host_lineage in self.host_system.host_lineages:
+            self._host_area_distribution[host_lineage] = {}
+            for area in self.host_system.areas:
+                self._host_area_distribution[host_lineage][area] = 0
 
         ## For quick look-up if host is infected
         self._infected_hosts = set()
 
-    def add_host(self, host_lineage, area_idx=None):
+    def add_host(self, host_lineage, area=None):
         """
         Adds a host to the distribution.
-        If ``area_idx`` is specified, then only the host in a specific area is infected.
+        If ``area`` is specified, then only the host in a specific area is infected.
         Otherwise, all hosts (of the given lineage) in all areas are infected.
         """
-        assert len(host_lineage.current_distribution) <= self.host_system.num_areas
-        if area_idx is None:
-            for area_idx, area_value in enumerate(host_lineage.current_distribution):
-                if area_value:
-                    self._distribution_matrix[host_lineage.lineage_id][area_idx] = 1
-                    self._area_idx_occurences[area_idx] += 1
+        if area is None:
+            for area in host_lineage.current_area_iter():
+                self._host_area_distribution[host_lineage][area] = 1
+                area.symbiont_lineages.add(self)
         else:
-            assert host_lineage.current_distribution[area_idx] == 1
-            self._distribution_matrix[host_lineage.lineage_id][area_idx] = 1
-            self._area_idx_occurences[area_idx] += 1
-        self._infected_hosts.add(host_lineage.lineage_id)
+            assert host_lineage.has_area(area)
+            self._host_area_distribution[host_lineage][area] = 1
+            area.symbiont_lineages.add(self)
+        self._infected_hosts.add(host_lineage)
 
     def remove_host(self, host_lineage, area_idx=None):
         """
@@ -436,47 +458,22 @@ class SymbiontHostAreaDistributionMatrix(object):
         If ``area_idx`` is specified, then only the host in that specific area is removed. Otherwise,
         Otherwise, all hosts (of the given lineage) of all areas are removed from the range.
         """
-        assert len(host_lineage.current_distribution) <= self.host_system.num_areas
-        if area_idx is None:
-            # for area_idx in range(self._distribution_matrix[host_lineage.lineage_id]):
-            for area_idx, area_value in enumerate(host_lineage.current_distribution):
-                self._distribution_matrix[host_lineage.lineage_id][area_idx] = 0
-                self._area_idx_occurences[area_idx] -= 1
-        else:
-            self._distribution_matrix[host_lineage.lineage_id][area_idx] = 1
-            self._area_idx_occurences[area_idx] -= 1
-        self._infected_hosts.remove(host_lineage.lineage_id)
-
-    def has_host(self, host_lineage, area_idx=None):
-        """
-        Returns True if host is infected with this parasite, False otherwise.
-        If ``area_idx`` is specified then only the host in that area is checked.
-        Otherwise, if the host is infected in *any* of its areas, returns True.
-        """
-        if area_idx is None:
-            return host_lineage.lineage_id in self._infected_hosts
-        else:
-            return self._distribution_matrix[host_lineage.lineage_id][area_idx] == 1
-
-    def has_area(self, area_idx):
-        """
-        Returns True if parasite occurs in area, False otherwise.
-        """
-        return self._area_idx_occurences[area_idx] > 0
+        raise NotImplementedError
 
 class SymbiontLineage(dendropy.Node):
 
     def __init__(self,
             index,
-            distribution_matrix=None,
+            host_area_distribution=None,
             ):
         dendropy.Node.__init__(self)
-        self.distribution_matrix = distribution_matrix
+        self.host_area_distribution = host_area_distribution
+        self.host_area_distribution.lineage = self
         self.index = index
         self.is_extant = True
         self.edge.length = 0
 
-class Phylogeny(dendropy.Tree):
+class SymbiontPhylogeny(dendropy.Tree):
 
     def node_factory(cls, **kwargs):
         return SymbiontLineage(**kwargs)
@@ -494,7 +491,7 @@ class Phylogeny(dendropy.Tree):
             if "seed_node" not in kwargs:
                 seed_node = self.node_factory(
                         index=next(self.lineage_indexer),
-                        distribution_matrix=self.seed_symbiont_distribution_matrix(),
+                        host_area_distribution=self.seed_symbiont_host_area_distribution(),
                         )
                 kwargs["seed_node"] = seed_node
             dendropy.Tree.__init__(self, *args, **kwargs)
@@ -511,154 +508,45 @@ class Phylogeny(dendropy.Tree):
         memo[id(self.taxon_namespace)] = self.taxon_namespace
         return dendropy.Tree.__deepcopy__(self, memo)
 
-    def new_symbiont_distribution_matrix(self):
-        dm = SymbiontHostAreaDistributionMatrix(host_system=self.model.host_system)
+    def new_symbiont_host_area_distribution(self, symbiont_lineage=None):
+        dm = SymbiontHostAreaDistribution(
+                symbiont_lineage=symbiont_lineage,
+                host_system=self.model.host_system)
         return dm
 
-    def seed_symbiont_distribution_matrix(self):
+    def seed_symbiont_host_area_distribution(self, symbiont_lineage=None):
         """
         Creates suitable distribution for initial lineage.
         """
         # current logic, single lineage occupying all hosts and areas at the
         # beginning of the simulation
-        dm = self.new_symbiont_distribution_matrix()
+        dm = self.new_symbiont_host_area_distribution(symbiont_lineage=symbiont_lineage)
         extant_host_lineages = self.model.host_system.extant_host_lineages_at_current_time(0)
         for host_lineage in extant_host_lineages:
             dm.add_host(host_lineage=host_lineage)
+        return dm
 
     def iterate_current_lineages(self):
         for lineage in self.current_lineages:
             yield lineage
 
     def split_lineage(self, lineage):
-        dist1, dist2 = self._get_daughter_distributions(lineage)
-        c1 = self.node_factory(
-                index=next(self.lineage_indexer),
-                distribution_vector=dist1,
-                traits_vector=lineage.traits_vector.clone(),
-                )
-        c2 = self.node_factory(
-                index=next(self.lineage_indexer),
-                distribution_vector=dist2,
-                traits_vector=lineage.traits_vector.clone(),
-                )
-        if self.debug_mode:
-            self.run_logger.debug("Splitting {} with distribution {} under speciation mode {} to: {} (distribution: {}) and {} (distribution: {})".format(
-                lineage,
-                lineage.distribution_vector.presences(),
-                speciation_mode,
-                c1,
-                dist1.presences(),
-                c2,
-                dist2.presences(),
-                ))
-            assert len(dist1.presences()) > 0
-            assert len(dist2.presences()) > 0
-
-        lineage.is_extant = False
-        self.current_lineages.remove(lineage)
-        lineage.add_child(c1)
-        lineage.add_child(c2)
-        self.current_lineages.add(c1)
-        self.current_lineages.add(c2)
+        pass
 
     def extinguish_lineage(self, lineage):
-        self._make_lineage_extinct_on_phylogeny(lineage)
+        pass
 
-    def contract_lineage_range(self, lineage):
-        presences = lineage.distribution_vector.presences()
-        assert len(presences) > 0
-        if len(presences) == 1:
-            self._make_lineage_extinct_on_phylogeny(lineage)
-        else:
-            lineage.distribution_vector[ self.rng.choice(presences) ] = 0
+    def expand_lineage_host_set(self, lineage):
+        pass
 
-    def _get_daughter_distributions(self, lineage):
-        # speciation modes
-        # 0:  single-area sympatric speciation
-        #     -   ancestral range copied to both daughter species
-        # 1:  sympatric subset: multi-area sympatric speciation
-        #     -   d1: inherits complete range
-        #     -   d2: inherits single area in ancestral range
-        # 2:  (single-area) vicariance
-        #     -   d1: single area
-        #     -   d2: all other areas
-        # 3:  (multi-area) vicariance
-        #     -   ancestral range divided up unequally between two daughter
-        #         species
-        # 4:  founder-event jump dispersal
-        #     -   single new area colonized
-        presences = lineage.distribution_vector.presences()
-        num_presences = len(presences)
-        num_areas = len(self.model.geography.area_indexes)
-        if num_presences <= 1:
-            speciation_mode = 0
-        else:
-            if num_presences < num_areas:
-                lineage_area_gain_rate = self.model.lineage_area_gain_rate_function(lineage)
-                fes_weight = self.model.cladogenesis_founder_event_speciation_weight * lineage_area_gain_rate
-            else:
-                fes_weight = 0.0
-            speciation_mode_weights = [
-                self.model.cladogenesis_sympatric_subset_speciation_weight,
-                self.model.cladogenesis_single_area_vicariance_speciation_weight,
-                self.model.cladogenesis_widespread_vicariance_speciation_weight,
-                fes_weight,
-            ]
-            sum_of_weights = sum(speciation_mode_weights)
-            speciation_mode = 1 + weighted_index_choice(
-                    weights=speciation_mode_weights,
-                    sum_of_weights=sum_of_weights,
-                    rng=self.rng)
-        if speciation_mode == 0:
-            # single-area sympatric speciation
-            #     -   ancestral range copied to both daughter species
-            dist1 = lineage.distribution_vector.clone()
-            dist2 = lineage.distribution_vector.clone()
-        elif speciation_mode == 1:
-            # sympatric subset: multi-area sympatric speciation
-            #     -   d1: inherits complete range
-            #     -   d2: inherits single area in ancestral range
-            dist1 = lineage.distribution_vector.clone()
-            dist2 = self.new_symbiont_distribution_matrix()
-            # TODO: area diversity base speciation
-            dist2[ self.rng.choice(presences) ] = 1
-        elif speciation_mode == 2:
-            # (single-area) allopatric vicariance
-            #     -   d1: single area
-            #     -   d2: all other areas
-            dist1 = self.new_symbiont_distribution_matrix()
-            dist2 = self.new_symbiont_distribution_matrix()
-            self.rng.shuffle(presences)
-            dist1[presences[0]] = 1
-            for idx in presences[1:]:
-                dist2[idx] = 1
-        elif speciation_mode == 3:
-            dist1 = self.new_symbiont_distribution_matrix()
-            dist2 = self.new_symbiont_distribution_matrix()
-            if num_presences == 2:
-                dist1[presences[0]] = 1
-                dist2[presences[1]] = 1
-            else:
-                n1 = self.rng.randint(1, num_presences-1)
-                n2 = num_presences - n1
-                if n2 == n1:
-                    n1 += 1
-                    n2 -= 1
-                sample1 = set(self.rng.sample(presences, n1))
-                for idx in self.model.geography.area_indexes:
-                    if idx in sample1:
-                        dist1[idx] = 1
-                    else:
-                        dist2[idx] = 1
-        elif speciation_mode == 4:
-            dist1 = lineage.distribution_vector.clone()
-            dist2 = self.new_symbiont_distribution_matrix()
-            absences = [idx for idx in self.model.geography.area_indexes if idx not in presences]
-            dist2[ self.rng.choice(absences) ] = 1
-        else:
-            raise ValueError(speciation_mode)
-        return dist1, dist2
+    def contract_lineage_host_set(self, lineage):
+        pass
+
+    def expand_lineage_area_set(self, lineage):
+        pass
+
+    def contract_lineage_area_set(self, lineage):
+        pass
 
     def _make_lineage_extinct_on_phylogeny(self, lineage):
         if len(self.current_lineages) == 1:
@@ -696,7 +584,7 @@ class Phylogeny(dendropy.Tree):
     #     return count
 
     # def extract_focal_areas_tree(self):
-    #     # tcopy = Phylogeny(self)
+    #     # tcopy = SymbiontPhylogeny(self)
     #     tcopy = copy.deepcopy(self)
     #     focal_area_lineages = tcopy.focal_area_lineages()
     #     if len(focal_area_lineages) < 2:
