@@ -339,6 +339,7 @@ class InphestSimulator(object):
             # (same notes apply as for "Anagenetic Host Set Evolution, Host Gain")
             occupied_areas = {}
             unoccupied_areas = {}
+            per_host_area_gain_rate = self.model.symbiont_lineage_area_gain_rate_function(lineage)
             for host_lineage in lineage.host_area_distribution.host_iter():
                 occupied_areas[host_lineage] = []
                 unoccupied_areas[host_lineage] = []
@@ -355,13 +356,31 @@ class InphestSimulator(object):
 
             #---
             # Anagenetic Area Set Evolution: Area Loss
-            area_loss_rate = self.model.lineage_area_loss_rate_function(lineage)
+            area_loss_rate = self.model.symbiont_lineage_area_loss_rate_function(lineage)
             if area_loss_rate:
                 event_calls.append( (self.phylogeny.contract_lineage_area_set, lineage) )
                 event_rates.append(area_loss_rate)
 
         # sum_of_event_rates = sum(event_rates)
         return event_calls, event_rates
+
+    def process_host_event(self, host_event):
+        if host_event.event_type == "anagenesis" and host_event.event_subtype == "area_gain":
+            host_lineage = self.model.host_system.host_lineages_by_id[host_event.lineage_id]
+            area = self.model.host_system.areas_by_index[host_event.area_idx]
+            host_lineage.add_area(area)
+        elif host_event.event_type == "anagenesis" and host_event.event_subtype == "area_loss":
+            host_lineage =self.model.host_system.host_lineages_by_id[host_event.lineage_id]
+            area = self.model.host_system.areas_by_index[host_event.area_idx]
+            host_lineage.remove_area(area)
+            for lineage in self.phylogeny.iterate_current_lineages():
+                if lineage.host_area_distribution.has_host_area(host_lineage, area):
+                    try:
+                        lineage.host_area_distribution.remove_host_area(host_lineage, area)
+                    except model.SymbiontHostAreaDistribution.NullDistributionException:
+                        self.phylogeny.extinguish_lineage(lineage)
+        elif host_event.event_type == "cladogenesis":
+            pass
 
     def store_sample(self, trees_file):
         self.write_tree(
@@ -383,26 +402,6 @@ class InphestSimulator(object):
                 node_label_compose_fn=labelf,
                 suppress_internal_node_labels=self.is_suppress_internal_node_labels,
                 )
-
-    # def write_focal_areas_tree(self, out, tree):
-    #     if self.is_encode_nodes:
-    #         labelf = lambda x: self.model.encode_lineage(x,
-    #                 set_label=False,
-    #                 add_annotation=self.is_annotate_nodes,
-    #                 exclude_supplemental_areas=True)
-    #     else:
-    #         labelf = InphestSimulator.simple_node_label_function
-    #     tree.write_to_stream(
-    #             out,
-    #             schema="newick",
-    #             suppress_annotations=False,
-    #             node_label_compose_fn=labelf,
-    #             suppress_internal_node_labels=self.is_suppress_internal_node_labels,
-    #             )
-
-
-    def process_host_event(self, host_event):
-        pass
 
     def debug_compose_tree(self, tree):
         labelf = lambda x: self.model.encode_lineage(x,

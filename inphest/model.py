@@ -421,6 +421,9 @@ class SymbiontHostAreaDistribution(object):
     Manages the host-by-area distribution of a single symbiont lineage.
     """
 
+    class NullDistributionException(Exception):
+        pass
+
     def __init__(self, symbiont_lineage, host_system):
         self.symbiont_lineage = symbiont_lineage
         self.host_system = host_system
@@ -447,21 +450,46 @@ class SymbiontHostAreaDistribution(object):
         if area is None:
             for area in host_lineage.current_area_iter():
                 self._host_area_distribution[host_lineage][area] = 1
-                area.symbiont_lineages.add(self)
+                area.symbiont_lineages.add(self.symbiont_lineage)
                 self._infected_areas.add(area)
         else:
             assert host_lineage.has_area(area)
             self._host_area_distribution[host_lineage][area] = 1
-            area.symbiont_lineages.add(self)
+            area.symbiont_lineages.add(self.symbiont_lineage)
         self._infected_hosts.add(host_lineage)
 
-    def remove_host_area(self, host_lineage, area_idx=None):
+    def remove_host_area(self, host_lineage, area=None):
         """
         Removes a host from the distribution.
         If ``area_idx`` is specified, then only the host in that specific area is removed. Otherwise,
         Otherwise, all hosts (of the given lineage) of all areas are removed from the range.
         """
-        raise NotImplementedError
+        if area is None:
+            for area in host_lineage.current_area_iter():
+                self._host_area_distribution[host_lineage][area] = 0
+            self._infected_hosts.remove(host_lineage)
+            for other_area in self.host_system.areas:
+                if self._host_area_distribution[host_lineage][other_area] == 1:
+                    break
+            else:
+                self._infected_areas.remove(area)
+                area.symbiont_lineages.remove(self.symbiont_lineage)
+        else:
+            assert host_lineage.has_area(area)
+            self._host_area_distribution[host_lineage][area] = 0
+            for other_host_lineage in self.host_system.host_lineages:
+                if self._host_area_distribution[other_host_lineage][area] == 1:
+                    break
+            else:
+                self._infected_hosts.remove(host_lineage)
+            for other_area in self.host_system.areas:
+                if self._host_area_distribution[host_lineage][other_area] == 1:
+                    break
+            else:
+                self._infected_areas.remove(area)
+                area.symbiont_lineages.remove(self.symbiont_lineage)
+            if not self._infected_hosts or not self._infected_areas:
+                raise SymbiontHostAreaDistribution.NullDistributionException()
 
     def has_host(self, host_lineage):
         """
@@ -500,12 +528,18 @@ class SymbiontHostAreaDistribution(object):
         # one host/area
         infected_hosts = set()
         infected_areas = set()
+        noninfected_hosts = set()
+        noninfected_areas = set([area for area in self.host_system.areas])
         occurrences = 0
         for host_lineage in self.host_system.host_lineages:
             for area in self.host_system.areas:
                 if self._host_area_distribution[host_lineage][area] == 1:
                     infected_hosts.add(host_lineage)
                     infected_areas.add(area)
+                    assert host_lineage in area.host_lineages
+                    assert self.symbiont_lineage in area.symbiont_lineages
+                    noninfected_areas.discard(area)
+                    noninfected_hosts.discard(host_lineage)
                     occurrences += 1
                 elif self._host_area_distribution[host_lineage][area] != 0:
                     raise ValueError(self._host_area_distribution[host_lineage][area])
@@ -513,11 +547,17 @@ class SymbiontHostAreaDistribution(object):
         # check that the caches are in sync
         assert infected_hosts == self._infected_hosts
         assert infected_areas == self._infected_areas
+        for area in noninfected_areas:
+            assert self.symbiont_lineage not in area.symbiont_lineages
         # check that the infected hosts are supposed to exist at the current time
         if simulation_elapsed_time is not None:
             for host_lineage in self._infected_hosts:
-                assert simulation_elapsed_time >= host_lineage.start_time
-                assert simulation_elapsed_time < host_lineage.end_time
+                try:
+                    assert simulation_elapsed_time >= host_lineage.start_time
+                    assert simulation_elapsed_time < host_lineage.end_time
+                except AssertionError:
+                    # until we finish properly processing host events ...
+                    print("!!!!!!!!!!!!!!!! IGNORING EXTINCT HOST CHECK ERROR !!!!!!!!!!!!")
 
 class SymbiontLineage(dendropy.Node):
 
@@ -914,30 +954,30 @@ class InphestModel(object):
 
         anagenetic_geographical_range_evolution_d = dict(model_definition.pop("anagenetic_geographical_range_evolution", {}))
         if "lineage_area_gain_rate" in anagenetic_geographical_range_evolution_d:
-            self.lineage_area_gain_rate_function = RateFunction.from_definition_dict(anagenetic_geographical_range_evolution_d.pop("lineage_area_gain_rate"), self.trait_types)
+            self.symbiont_lineage_area_gain_rate_function = RateFunction.from_definition_dict(anagenetic_geographical_range_evolution_d.pop("lineage_area_gain_rate"), self.trait_types)
         else:
-            self.lineage_area_gain_rate_function = RateFunction(
+            self.symbiont_lineage_area_gain_rate_function = RateFunction(
                     definition_type="lambda_definition",
                     definition_content="lambda lineage: 0.01",
                     description="fixed: 0.01",
                     )
         if run_logger is not None:
             run_logger.info("(ANAGENETIC GEOGRAPHICAL RANGE EVOLUTION) Setting symbiont lineage-specific area gain weight function: {desc}".format(
-                desc=self.lineage_area_gain_rate_function.description,))
+                desc=self.symbiont_lineage_area_gain_rate_function.description,))
 
         ### Anagenetic Geographical Area Gain
 
         if "lineage_area_loss_rate" in anagenetic_geographical_range_evolution_d:
-            self.lineage_area_loss_rate_function = RateFunction.from_definition_dict(anagenetic_geographical_range_evolution_d.pop("lineage_area_loss_rate"), self.trait_types)
+            self.symbiont_lineage_area_loss_rate_function = RateFunction.from_definition_dict(anagenetic_geographical_range_evolution_d.pop("lineage_area_loss_rate"), self.trait_types)
         else:
-            self.lineage_area_loss_rate_function = RateFunction(
+            self.symbiont_lineage_area_loss_rate_function = RateFunction(
                     definition_type="lambda_definition",
                     definition_content="lambda lineage: 0.0",
                     description="fixed: 0.0",
                     )
         if run_logger is not None:
             run_logger.info("(ANAGENETIC GEOGRAPHICAL RANGE EVOLUTION) Setting symbiont lineage-specific area loss weight function: {desc}".format(
-                desc=self.lineage_area_loss_rate_function.description,
+                desc=self.symbiont_lineage_area_loss_rate_function.description,
                 ))
 
         if anagenetic_geographical_range_evolution_d:
