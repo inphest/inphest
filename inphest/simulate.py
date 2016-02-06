@@ -220,7 +220,23 @@ class InphestSimulator(object):
 
             time_till_event = self.rng.expovariate(sum_of_event_rates)
 
-            self.elapsed_time += time_till_event
+            next_host_event = self.model.host_system.host_events.pop(0)
+            if next_host_event.event_time > (self.elapsed_time + time_till_event):
+                self.elapsed_time = next_host_event.event_time
+                event_f = self.process_host_event
+                event_args = next_host_event
+                if self.debug_mode:
+                    self.run_logger.debug("Host Event {}: {}".format(num_events, next_host_event))
+            else:
+                self.elapsed_time += time_till_event
+                event_idx = model.weighted_index_choice(
+                        weights=event_rates,
+                        sum_of_weights=sum_of_event_rates,
+                        rng=self.rng)
+                if self.debug_mode:
+                    self.run_logger.debug("Event {}: {}".format(num_events, event_calls[event_idx]))
+                event_f = event_calls[event_idx][0]
+                event_args = event_calls[event_idx][1:]
             if self.model.max_time and self.elapsed_time > self.model.max_time:
                 self.elapsed_time = self.model.max_time
                 self.run_logger.info("Termination condition of t = {} reached: storing results and terminating".format(self.elapsed_time))
@@ -229,14 +245,9 @@ class InphestSimulator(object):
             for lineage in self.phylogeny.iterate_current_lineages():
                 lineage.edge.length += time_till_event
 
-            ### EVENT SELECTION AND EXECUTION
-            event_idx = model.weighted_index_choice(
-                    weights=event_rates,
-                    sum_of_weights=sum_of_event_rates,
-                    rng=self.rng)
-            if self.debug_mode:
-                self.run_logger.debug("Event {}: {}".format(num_events, event_calls[event_idx]))
-            event_calls[event_idx][0](*event_calls[event_idx][1:])
+            ### EVENT EXECUTION
+            event_f(*event_args)
+            # event_calls[event_idx][0](*event_calls[event_idx][1:])
 
             ### DEBUG
             if self.debug_mode:
@@ -397,6 +408,9 @@ class InphestSimulator(object):
     #             node_label_compose_fn=labelf,
     #             suppress_internal_node_labels=self.is_suppress_internal_node_labels,
     #             )
+
+    def process_host_event(self, host_event):
+        pass
 
     def debug_compose_tree(self, tree):
         labelf = lambda x: self.model.encode_lineage(x,
