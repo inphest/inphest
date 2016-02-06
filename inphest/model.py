@@ -496,17 +496,24 @@ class SymbiontHostAreaDistribution(object):
         return area in self._infected_areas
 
     def debug_check(self, simulation_elapsed_time=None):
+        # check that, as an extant lineage, it occupies at least
+        # one host/area
         infected_hosts = set()
         infected_areas = set()
+        occurrences = 0
         for host_lineage in self.host_system.host_lineages:
             for area in self.host_system.areas:
                 if self._host_area_distribution[host_lineage][area] == 1:
                     infected_hosts.add(host_lineage)
                     infected_areas.add(area)
+                    occurrences += 1
                 elif self._host_area_distribution[host_lineage][area] != 0:
                     raise ValueError(self._host_area_distribution[host_lineage][area])
+        assert occurrences > 0
+        # check that the caches are in sync
         assert infected_hosts == self._infected_hosts
         assert infected_areas == self._infected_areas
+        # check that the infected hosts are supposed to exist at the current time
         if simulation_elapsed_time is not None:
             for host_lineage in self._infected_hosts:
                 assert simulation_elapsed_time >= host_lineage.start_time

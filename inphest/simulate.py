@@ -262,8 +262,7 @@ class InphestSimulator(object):
                 self.phylogeny._debug_check_tree()
                 for lineage in self.phylogeny.current_lineages:
                     assert lineage.is_extant
-                    assert len(lineage.distribution_vector.presences()) > 0
-
+                    lineage.host_area_distribution.debug_check(simulation_elapsed_time=self.elapsed_time)
 
             # if self.model.gsa_termination_focal_area_lineages and ntips_in_focal_areas >= self.model.gsa_termination_focal_area_lineages:
             #     # select/process one of the previously stored snapshots, write to final results file,
