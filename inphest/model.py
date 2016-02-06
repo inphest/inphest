@@ -207,7 +207,6 @@ class HostRegime(object):
             self.taxon_namespace = dendropy.TaxonNamespace()
         else:
             self.taxon_namespace = taxon_namespace
-        self.next_event_index = 0
         self.events = [] # collection of HostEvent objects, sorted by time
         self.lineages = {} # keys: lineage_id (== int(Bipartition) == Bipartition.bitmask); values: HostRegimeLineageDefinition
         self.start_time = None
@@ -395,6 +394,9 @@ class HostSystem(object):
             self.host_lineages.add(host)
             self.host_lineages_by_id[host.lineage_id] = host
 
+        # local copy of host events
+        self.host_events = list(self.host_regime.events)
+
     def extant_host_lineages_at_current_time(self, current_time):
         ## TODO: if we hit this often, we need to construct a look-up table
         lineages = set()
@@ -426,17 +428,17 @@ class SymbiontHostAreaDistribution(object):
         ## distribution set: tuples of (host_lineage_id, area_idx)
         # self._host_area_distribution = set()
 
-        ## distribution matrix: [host_lineage_id][area_idx]
         self._host_area_distribution = {}
         for host_lineage in self.host_system.host_lineages:
             self._host_area_distribution[host_lineage] = {}
             for area in self.host_system.areas:
                 self._host_area_distribution[host_lineage][area] = 0
 
-        ## For quick look-up if host is infected
+        ## For quick look-up if host/area is infected
         self._infected_hosts = set()
+        self._infected_areas = set()
 
-    def add_host(self, host_lineage, area=None):
+    def add_host_area(self, host_lineage, area=None):
         """
         Adds a host to the distribution.
         If ``area`` is specified, then only the host in a specific area is infected.
@@ -446,19 +448,52 @@ class SymbiontHostAreaDistribution(object):
             for area in host_lineage.current_area_iter():
                 self._host_area_distribution[host_lineage][area] = 1
                 area.symbiont_lineages.add(self)
+                self._infected_areas.add(area)
         else:
             assert host_lineage.has_area(area)
             self._host_area_distribution[host_lineage][area] = 1
             area.symbiont_lineages.add(self)
         self._infected_hosts.add(host_lineage)
 
-    def remove_host(self, host_lineage, area_idx=None):
+    def remove_host_area(self, host_lineage, area_idx=None):
         """
         Removes a host from the distribution.
         If ``area_idx`` is specified, then only the host in that specific area is removed. Otherwise,
         Otherwise, all hosts (of the given lineage) of all areas are removed from the range.
         """
         raise NotImplementedError
+
+    def has_host(self, host_lineage):
+        """
+        Returns True if host is infected in any of its areas.
+        """
+        return host_lineage in self._infected_hosts
+
+    def has_host_area(self, host_lineage, area):
+        """
+        Returns True if host is infected in a particular area.
+        """
+        return self._host_area_distribution[host_lineage][area] == 1
+
+    def host_iter(self):
+        """
+        Iterates over hosts in which lineage occurs.
+        """
+        for host in self._infected_hosts:
+            yield host
+
+    def area_iter(self):
+        """
+        Iterates over areas in which lineage occurs.
+        """
+        for area in self._infected_areas:
+            yield area
+
+    def has_area(self, area):
+        """
+        Returns True if area is infected.
+        """
+        return area in self._infected_areas
 
 class SymbiontLineage(dendropy.Node):
 
@@ -523,7 +558,7 @@ class SymbiontPhylogeny(dendropy.Tree):
         dm = self.new_symbiont_host_area_distribution(symbiont_lineage=symbiont_lineage)
         extant_host_lineages = self.model.host_system.extant_host_lineages_at_current_time(0)
         for host_lineage in extant_host_lineages:
-            dm.add_host(host_lineage=host_lineage)
+            dm.add_host_area(host_lineage=host_lineage)
         return dm
 
     def iterate_current_lineages(self):

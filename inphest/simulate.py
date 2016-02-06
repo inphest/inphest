@@ -219,6 +219,7 @@ class InphestSimulator(object):
                     self.run_logger.debug("Sum of event rates is 0: {}".format(event_rates))
 
             time_till_event = self.rng.expovariate(sum_of_event_rates)
+
             self.elapsed_time += time_till_event
             if self.model.max_time and self.elapsed_time > self.model.max_time:
                 self.elapsed_time = self.model.max_time
@@ -272,66 +273,80 @@ class InphestSimulator(object):
         #         num_current_lineages))
 
         for lineage in self.phylogeny.iterate_current_lineages():
-            # speciation
+
+            #---
+            # Diversification Process: Birth (Speciation)
             speciation_rate = self.model.symbiont_lineage_birth_rate_function(lineage)
             if speciation_rate:
                 event_calls.append( (self.phylogeny.split_lineage, lineage) )
                 event_rates.append(speciation_rate)
-            # extinction
+
+            #---
+            # Diversification Process: Death (Extinction)
             extinction_rate = self.model.symbiont_lineage_death_rate_function(lineage)
             if extinction_rate:
                 event_calls.append( (self.phylogeny.extinguish_lineage, lineage) )
                 event_rates.append(extinction_rate)
-            # anagenetic host gain
-            ## TODO!
-            ##      get set of areas in which parasite currently occurs
-            ##      for each area, a:
-            ##          get set of hosts in area, H(a)
-            ##          out of this,
-            ##              get set of hosts already associated with parasite P(h=1, h \in H(a))
-            ##              get set of hosts not with parasite P(h=0, h \in H(a))
-            ##          for each host in area not associated with parasite,
-            ##              calculate transmission probability as sum of being infected by any other host
-            ##              add event
-            # host_gain_rate = self.model.symbiont_lineage_host_gain_rate_function(lineage)
-            # if host_gain_rate:
-            #     event_calls.append( (self.phylogeny.expand_lineage_host_set, lineage) )
-            #     event_rates.append(host_gain_rate)
-            # anagenetic host loss
+
+            #---
+            # Anagenetic Host Set Evolution: Host Gain
+            ## Note: a little more complicated than might be immediately needs, to allow
+            ## for the fact that "rate" might need to be adjusted to reflect a
+            ## "global infection rate", i.e., across all host/area.
+            infected_hosts = {}
+            uninfected_hosts = {}
+            for area in lineage.host_area_distribution.area_iter():
+                infected_hosts[area] = []
+                uninfected_hosts[area] = []
+                for host_lineage in area.host_lineages:
+                    if lineage.host_area_distribution.has_host(host_lineage):
+                        infected_hosts[area].append( host_lineage )
+                    else:
+                        uninfected_hosts[area].append( host_lineage )
+            # Here, if needed, we can adjust the rate to model a global infection rate
+            # rather than a per-event infection rate.
+            per_area_host_infection_rate = self.model.symbiont_lineage_host_gain_rate_function(lineage)
+            # If we stick to a per-event infection rate, this loop can, of course,
+            # be merged with the previous one.
+            for area in lineage.host_area_distribution.area_iter():
+                for src_host in infected_hosts[area]:
+                    for dest_host in uninfected_hosts[area]:
+                        event_calls.append( (self.phylogeny.expand_lineage_host_set, (lineage, dest_host, area)) )
+                        event_rates.append(per_area_host_infection_rate)
+
+            #---
+            # Anagenetic Host Set Evolution: Host Loss
             host_loss_rate = self.model.symbiont_lineage_host_loss_rate_function(lineage)
             if host_loss_rate:
                 event_calls.append( (self.phylogeny.contract_lineage_host_set, lineage) )
                 event_rates.append(host_loss_rate)
-            # dispersal
-            lineage_area_gain_rate = self.model.lineage_area_gain_rate_function(lineage)
-            if not lineage_area_gain_rate:
-                continue
-            # anagenetic area gain
 
-            ## TODO!
-            ## for each host, check to see if any unoccupied areas;
-            ## then see what the total probability of dispersing to that area (i.e., summing up over all source areas of the host)
+            #---
+            # Anagenetic Area Set Evolution: Area Gain
+            # (same notes apply as for "Anagenetic Host Set Evolution, Host Gain")
+            occupied_areas = {}
+            unoccupied_areas = {}
+            for host_lineage in lineage.host_area_distribution.host_iter():
+                occupied_areas[host_lineage] = []
+                unoccupied_areas[host_lineage] = []
+                for area in host_lineage.current_area_iter():
+                    if lineage.host_area_distribution.has_host_area(host_lineage, area):
+                        occupied_areas[host_lineage].append(area)
+                    else:
+                        unoccupied_areas[host_lineage].append(area)
+            for host_lineage in lineage.host_area_distribution.host_iter():
+                for src_area in occupied_areas[host_lineage]:
+                    for dest_area in unoccupied_areas[host_lineage]:
+                        event_calls.append( (self.phylogeny.expand_lineage_area_set, (lineage, host_lineage, dest_area)) )
+                        event_rates.append(per_host_area_gain_rate)
 
-            for dest_area_idx in self.model.geography.area_indexes:
-                if lineage.distribution_vector[dest_area_idx]:
-                    # already occurs here: do we model it or not?
-                    continue
-                sum_of_area_connection_weights_to_dest = 0.0
-                for src_area_idx, occurs in enumerate(lineage.distribution_vector):
-                    if not occurs:
-                        continue
-                    if dest_area_idx == src_area_idx:
-                        continue
-                    sum_of_area_connection_weights_to_dest += lineage_area_gain_rate * self.model.geography.area_connection_weights[src_area_idx][dest_area_idx]
-                if sum_of_area_connection_weights_to_dest:
-                    event_calls.append( (self.phylogeny.disperse_lineage, lineage, dest_area_idx) )
-                    event_rates.append(sum_of_area_connection_weights_to_dest)
-
-            # anagenetic area loss
+            #---
+            # Anagenetic Area Set Evolution: Area Loss
             area_loss_rate = self.model.lineage_area_loss_rate_function(lineage)
             if area_loss_rate:
                 event_calls.append( (self.phylogeny.contract_lineage_area_set, lineage) )
                 event_rates.append(area_loss_rate)
+
         # sum_of_event_rates = sum(event_rates)
         return event_calls, event_rates
 
