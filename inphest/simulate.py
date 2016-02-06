@@ -220,23 +220,30 @@ class InphestSimulator(object):
 
             time_till_event = self.rng.expovariate(sum_of_event_rates)
 
-            next_host_event = self.model.host_system.host_events.pop(0)
-            if next_host_event.event_time > (self.elapsed_time + time_till_event):
-                self.elapsed_time = next_host_event.event_time
+            try:
+                next_host_event = self.model.host_system.host_events.pop(0)
+            except IndexError: # pop from empty list
+                next_host_event = None
+            if next_host_event and next_host_event.event_time < (self.elapsed_time + time_till_event):
+                time_till_event = next_host_event.event_time - self.elapsed_time
                 if self.debug_mode:
-                    self.run_logger.debug("Host Event {}: {}".format(num_events, next_host_event))
+                    self.run_logger.debug("Host Event {} of {}: {}".format(
+                        len(self.model.host_system.host_regime.events)-len(self.model.host_system.host_events),
+                        len(self.model.host_system.host_regime.events),
+                        next_host_event))
                 event_f = self.process_host_event
                 event_args = (next_host_event,)
             else:
-                self.elapsed_time += time_till_event
                 event_idx = model.weighted_index_choice(
                         weights=event_rates,
                         sum_of_weights=sum_of_event_rates,
                         rng=self.rng)
                 if self.debug_mode:
-                    self.run_logger.debug("Event {}: {}".format(num_events, event_calls[event_idx]))
+                    self.run_logger.debug("Symbiont Event {}: {}".format(num_events, event_calls[event_idx]))
                 event_f = event_calls[event_idx][0]
                 event_args = event_calls[event_idx][1:]
+
+            self.elapsed_time += time_till_event
             if self.model.max_time and self.elapsed_time > self.model.max_time:
                 self.elapsed_time = self.model.max_time
                 self.run_logger.info("Termination condition of t = {} reached: storing results and terminating".format(self.elapsed_time))
