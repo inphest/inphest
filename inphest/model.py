@@ -495,6 +495,23 @@ class SymbiontHostAreaDistribution(object):
         """
         return area in self._infected_areas
 
+    def debug_check(self, simulation_elapsed_time=None):
+        infected_hosts = set()
+        infected_areas = set()
+        for host_lineage in self.host_system.host_lineages:
+            for area in self.host_system.areas:
+                if self._host_area_distribution[host_lineage][area] == 1:
+                    infected_hosts.add(host_lineage)
+                    infected_areas.add(area)
+                elif self._host_area_distribution[host_lineage][area] != 0:
+                    raise ValueError(self._host_area_distribution[host_lineage][area])
+        assert infected_hosts == self._infected_hosts
+        assert infected_areas == self._infected_areas
+        if simulation_elapsed_time is not None:
+            for host_lineage in self._infected_hosts:
+                assert simulation_elapsed_time >= host_lineage.start_time
+                assert simulation_elapsed_time < host_lineage.end_time
+
 class SymbiontLineage(dendropy.Node):
 
     def __init__(self,

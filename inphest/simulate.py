@@ -107,16 +107,16 @@ class InphestSimulator(object):
         self.is_encode_nodes = config_d.pop("encode_nodes", True)
         if verbose:
             if self.is_encode_nodes:
-                self.run_logger.info("Trait states and ranges will be encoded on node labels")
+                self.run_logger.info("Host associations and geographical ranges will be encoded on node labels")
             else:
-                self.run_logger.info("Trait states and ranges will NOT be encoded on node labels")
+                self.run_logger.info("Host associations and geographical ranges will NOT be encoded on node labels")
 
         self.is_annotate_nodes = config_d.pop("annotate_nodes", False)
         if verbose:
             if self.is_annotate_nodes:
-                self.run_logger.info("Trait states and ranges will be annotated on node labels")
+                self.run_logger.info("Host associations and geographical ranges will be annotated on node labels")
             else:
-                self.run_logger.info("Trait states and ranges will NOT be annotated on node labels")
+                self.run_logger.info("Host associations and geographical ranges will NOT be annotated on node labels")
 
         self.rng = config_d.pop("rng", None)
         if self.rng is None:
@@ -198,7 +198,7 @@ class InphestSimulator(object):
                 self.phylogeny._debug_check_tree()
                 for lineage in self.phylogeny.current_lineages:
                     assert lineage.is_extant
-                    assert len(lineage.distribution_vector.presences()) > 0
+                    lineage.host_area_distribution.debug_check(simulation_elapsed_time=self.elapsed_time)
 
             ### LOGGING
             if self.log_frequency:
@@ -584,7 +584,7 @@ if __name__ == "__main__":
         stderr_logging_level="info",
         file_logging_level="debug",
         maximum_num_restarts_per_replicates=100,
-        debug_mode=False)
+        debug_mode=True)
 
     # hrs = model.HostRegimeSamples()
     # rb_data = os.path.join(utility.TEST_DATA_PATH, "revbayes", "bg_large.events.txt")
