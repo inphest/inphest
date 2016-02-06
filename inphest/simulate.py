@@ -223,10 +223,10 @@ class InphestSimulator(object):
             next_host_event = self.model.host_system.host_events.pop(0)
             if next_host_event.event_time > (self.elapsed_time + time_till_event):
                 self.elapsed_time = next_host_event.event_time
-                event_f = self.process_host_event
-                event_args = next_host_event
                 if self.debug_mode:
                     self.run_logger.debug("Host Event {}: {}".format(num_events, next_host_event))
+                event_f = self.process_host_event
+                event_args = (next_host_event,)
             else:
                 self.elapsed_time += time_till_event
                 event_idx = model.weighted_index_choice(
@@ -247,7 +247,6 @@ class InphestSimulator(object):
 
             ### EVENT EXECUTION
             event_f(*event_args)
-            # event_calls[event_idx][0](*event_calls[event_idx][1:])
 
             ### DEBUG
             if self.debug_mode:
@@ -258,9 +257,6 @@ class InphestSimulator(object):
                     assert lineage.is_extant
                     assert len(lineage.distribution_vector.presences()) > 0
 
-
-            ntips_in_focal_areas = self.phylogeny.num_focal_area_lineages()
-            ntips = len(self.phylogeny.current_lineages)
 
             # if self.model.gsa_termination_focal_area_lineages and ntips_in_focal_areas >= self.model.gsa_termination_focal_area_lineages:
             #     # select/process one of the previously stored snapshots, write to final results file,
@@ -361,21 +357,26 @@ class InphestSimulator(object):
         # sum_of_event_rates = sum(event_rates)
         return event_calls, event_rates
 
-    # def store_sample(self, focal_areas_tree_out, all_areas_tree_out):
-    #     if focal_areas_tree_out is not None:
-    #         focal_areas_tree = self.phylogeny.extract_focal_areas_tree()
-    #         n = len(focal_areas_tree.seed_node._child_nodes)
-    #         if n < 2:
-    #             raise error.InsufficientFocalAreaLineagesSimulationException("Insufficient lineages in focal area: {}".format(n))
-    #         self.write_focal_areas_tree(
-    #                 out=focal_areas_tree_out,
-    #                 tree=focal_areas_tree,
-    #                 )
-    #     if all_areas_tree_out is not None:
-    #         self.write_all_areas_tree(
-    #                 out=all_areas_tree_out,
-    #                 tree=self.phylogeny,
-    #                 )
+    def store_sample(self, trees_file):
+        self.write_tree(
+                out=trees_file,
+                tree=self.phylogeny,
+                )
+
+    def write_tree(self, out, tree):
+        if self.is_encode_nodes:
+            labelf = lambda x: self.model.encode_lineage(x,
+                    set_label=False,
+                    add_annotation=self.is_annotate_nodes)
+        else:
+            labelf = InphestSimulator.simple_node_label_function
+        tree.write_to_stream(
+                out,
+                schema="newick",
+                suppress_annotations=False,
+                node_label_compose_fn=labelf,
+                suppress_internal_node_labels=self.is_suppress_internal_node_labels,
+                )
 
     # def write_focal_areas_tree(self, out, tree):
     #     if self.is_encode_nodes:
@@ -393,21 +394,6 @@ class InphestSimulator(object):
     #             suppress_internal_node_labels=self.is_suppress_internal_node_labels,
     #             )
 
-    # def write_all_areas_tree(self, out, tree):
-    #     if self.is_encode_nodes:
-    #         labelf = lambda x: self.model.encode_lineage(x,
-    #                 set_label=False,
-    #                 add_annotation=self.is_annotate_nodes,
-    #                 exclude_supplemental_areas=False)
-    #     else:
-    #         labelf = InphestSimulator.simple_node_label_function
-    #     tree.write_to_stream(
-    #             out,
-    #             schema="newick",
-    #             suppress_annotations=False,
-    #             node_label_compose_fn=labelf,
-    #             suppress_internal_node_labels=self.is_suppress_internal_node_labels,
-    #             )
 
     def process_host_event(self, host_event):
         pass

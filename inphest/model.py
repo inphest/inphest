@@ -718,24 +718,9 @@ class InphestModel(object):
         return archipelago_model
 
     @staticmethod
-    def compose_encoded_label(
-            lineage,
-            excluded_area_indexes=None):
-        raise NotImplementedError
-        # if lineage.traits_vector:
-        #     traits_v = ArchipelagoModel._TRAITS_SEPARATOR.join(str(i) for i in lineage.traits_vector)
-        # else:
-        #     traits_v = ArchipelagoModel._NULL_TRAITS
-        # if excluded_area_indexes is None:
-        #     areas_v = "".join(str(i) for i in lineage.distribution_vector)
-        # else:
-        #     areas_v = "".join(str(i) for idx, i in enumerate(lineage.distribution_vector) if idx not in excluded_area_indexes)
-        # encoding = "s{lineage_index}{sep}{traits_v}{sep}{areas_v}".format(
-        #         lineage_index=lineage.index,
-        #         traits_v=traits_v,
-        #         areas_v=areas_v,
-        #         sep=ArchipelagoModel._LABEL_COMPONENTS_SEPARATOR)
-        # return encoding
+    def compose_encoded_label(symbiont_lineage):
+        return "s{lineage_index}".format(lineage_index=symbiont_lineage.index)
+        return encoding
 
     @staticmethod
     def decode_label(label):
@@ -958,15 +943,11 @@ class InphestModel(object):
             raise TypeError("Unsupported model keywords: {}".format(model_definition))
 
     def encode_lineage(self,
-            lineage,
+            symbiont_lineage,
             set_label=False,
             add_annotation=False,
-            exclude_supplemental_areas=False,
             ):
-        encoded_label = ArchipelagoModel.compose_encoded_label(
-                lineage=lineage,
-                excluded_area_indexes=self.geography.supplemental_area_indexes if exclude_supplemental_areas else None,
-                )
+        encoded_label = InphestModel.compose_encoded_label(symbiont_lineage=symbiont_lineage)
         if set_label:
             lineage.label =encoded_label
         if add_annotation:
