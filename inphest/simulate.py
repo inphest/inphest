@@ -59,9 +59,17 @@ class InphestSimulator(object):
         # set up model
         self.model = inphest_model
 
+        # initialize host system
+        self.host_system = model.HostSystem(
+                host_regime=self.model.host_regime,
+                debug_mode=self.debug_mode,
+                run_logger=self.run_logger,
+                )
+
         # initialize phylogeny
         self.phylogeny = model.SymbiontPhylogeny(
                 model=self.model,
+                host_system=self.host_system,
                 rng=self.rng,
                 debug_mode=self.debug_mode,
                 run_logger=self.run_logger,
@@ -180,7 +188,11 @@ class InphestSimulator(object):
         if self.log_frequency:
             last_logged_time = 0.0
 
-        ### Initialize debugging
+        ### check system
+        if self.debug_mode:
+            self.host_system.debug_check()
+
+        ### Initialize run debugging
         if self.debug_mode:
             num_events = 0
 
@@ -221,15 +233,15 @@ class InphestSimulator(object):
             time_till_event = self.rng.expovariate(sum_of_event_rates)
 
             try:
-                next_host_event = self.model.host_system.host_events.pop(0)
+                next_host_event = self.host_system.host_events.pop(0)
             except IndexError: # pop from empty list
                 next_host_event = None
             if next_host_event and next_host_event.event_time < (self.elapsed_time + time_till_event):
                 time_till_event = next_host_event.event_time - self.elapsed_time
                 if self.debug_mode:
                     self.run_logger.debug("Host Event {} of {}: {}".format(
-                        len(self.model.host_system.host_regime.events)-len(self.model.host_system.host_events),
-                        len(self.model.host_system.host_regime.events),
+                        len(self.host_system.host_regime.events)-len(self.host_system.host_events),
+                        len(self.host_system.host_regime.events),
                         next_host_event))
                 event_f = self.process_host_event
                 event_args = (next_host_event,)
@@ -365,13 +377,15 @@ class InphestSimulator(object):
         return event_calls, event_rates
 
     def process_host_event(self, host_event):
+        host_lineage =self.host_system.host_lineages_by_id[host_event.lineage_id]
+        if self.debug_mode:
+            host_lineage.debug_check()
         if host_event.event_type == "anagenesis" and host_event.event_subtype == "area_gain":
-            host_lineage = self.model.host_system.host_lineages_by_id[host_event.lineage_id]
-            area = self.model.host_system.areas_by_index[host_event.area_idx]
+            area = self.host_system.areas_by_index[host_event.area_idx]
             host_lineage.add_area(area)
         elif host_event.event_type == "anagenesis" and host_event.event_subtype == "area_loss":
-            host_lineage =self.model.host_system.host_lineages_by_id[host_event.lineage_id]
-            area = self.model.host_system.areas_by_index[host_event.area_idx]
+            print("Losing area {} from: {}".format(host_event.area_idx, host_lineage._current_areas))
+            area = self.host_system.areas_by_index[host_event.area_idx]
             host_lineage.remove_area(area)
             for lineage in self.phylogeny.iterate_current_lineages():
                 if lineage.host_area_distribution.has_host_area(host_lineage, area):
@@ -381,6 +395,8 @@ class InphestSimulator(object):
                         self.phylogeny.extinguish_lineage(lineage)
         elif host_event.event_type == "cladogenesis":
             pass
+        if self.debug_mode:
+            host_lineage.debug_check()
 
     def store_sample(self, trees_file):
         self.write_tree(

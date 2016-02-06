@@ -294,6 +294,87 @@ class HostRegimeSamples(object):
                     )
             self.host_regimes.append(host_regime)
 
+class Area(object):
+
+    """
+    Manages the state of an area during a particular simulation replicate.
+    """
+
+    def __init__(self, area_idx):
+        self.area_idx = area_idx
+        self.host_lineages = set()
+        self.symbiont_lineages = set()
+
+    def __str__(self):
+        return "Area{}".format(self.area_idx)
+
+    def __repr__(self):
+        return "<inphest.model.Area object at {} with index {}>".format(id(self), self.area_idx)
+
+class HostLineage(object):
+    """
+    Manages the state of a host during a particular simulation replicate.
+    """
+
+    def __init__(self,
+            host_regime_lineage_definition,
+            host_system,
+            debug_mode):
+        self.host_regime_lineage_definition = host_regime_lineage_definition
+        self.host_system = host_system
+        self.lineage_id = host_regime_lineage_definition.lineage_id
+        self.start_time = host_regime_lineage_definition.lineage_start_time
+        self.end_time = host_regime_lineage_definition.lineage_end_time
+        self.start_distribution_bitstring = host_regime_lineage_definition.lineage_start_distribution_bitstring
+        self.end_distribution_bitstring = host_regime_lineage_definition.lineage_end_distribution_bitstring
+        self.current_distribution_bitstring = host_regime_lineage_definition.lineage_end_distribution_bitstring
+        self._current_areas = set()
+        assert len(self.host_system.areas) == len(self.start_distribution_bitstring)
+        for area, presence in zip(self.host_system.areas, self.start_distribution_bitstring):
+            if presence == "1":
+                self.add_area(area)
+            else:
+                assert presence == "0"
+
+    def add_area(self, area):
+        self._current_areas.add(area)
+        area.host_lineages.add(self)
+
+    def remove_area(self, area):
+        self._current_areas.remove(area)
+        area.host_lineages.remove(self)
+
+    def has_area(self, area):
+        return area in self._current_areas
+
+    def current_area_iter(self):
+        for area in self._current_areas:
+            yield area
+
+    def debug_check(self):
+        for area in self.host_system.areas:
+            if area in self._current_areas:
+                assert self in area.host_lineages
+            else:
+                assert self not in area.host_lineages
+
+    # def area_iter(self):
+    #     """
+    #     Iterate over areas in which this host occurs.
+    #     """
+    #     for area_idx in self.current_distribution_bitvector:
+    #         if self.current_distribution_bitvector[area_idx] == 1:
+    #             yield self.host_system.areas[area_idx]
+
+    # def add_area(self, area_idx):
+    #     self.current_distribution_bitvector[area_idx] = 1
+
+    # def remove_area(self, area_idx):
+    #     self.current_distribution_bitvector[area_idx] = 0
+
+    # def has_area(self, area_idx):
+    #     return self.current_distribution_bitvector[area_idx] == 1
+
 class HostSystem(object):
     """
     Models the the collection of hosts for a particular simulation replicate,
@@ -302,63 +383,14 @@ class HostSystem(object):
     tracks state etc. for a single replicate.
     """
 
-    class HostLineage(object):
-        """
-        Manages the state of a host during a particular simulation replicate.
-        """
+    def __init__(self,
+            host_regime,
+            debug_mode=False,
+            run_logger=None):
+        self.debug_mode = debug_mode
+        self.compile(host_regime, debug_mode=debug_mode)
 
-        def __init__(self,
-                host_regime_lineage_definition,
-                host_system):
-            self.host_regime_lineage_definition = host_regime_lineage_definition
-            self.host_system = host_system
-            self.lineage_id = host_regime_lineage_definition.lineage_id
-            self.start_time = host_regime_lineage_definition.lineage_start_time
-            self.end_time = host_regime_lineage_definition.lineage_end_time
-            self.start_distribution_bitstring = host_regime_lineage_definition.lineage_start_distribution_bitstring
-            self.end_distribution_bitstring = host_regime_lineage_definition.lineage_end_distribution_bitstring
-            self._current_areas = set()
-            assert len(self.host_system.areas) == len(self.start_distribution_bitstring)
-            for area, presence in zip(self.host_system.areas, self.start_distribution_bitstring):
-                if presence == "1":
-                    self.add_area(area)
-
-        def add_area(self, area):
-            self._current_areas.add(area)
-            area.host_lineages.add(self)
-
-        def remove_area(self, area):
-            self._current_areas.remove(area)
-            area.host_lineages.remove(self)
-
-        def has_area(self, area):
-            return area in self._current_areas
-
-        def current_area_iter(self):
-            for area in self._current_areas:
-                yield area
-
-        # def area_iter(self):
-        #     """
-        #     Iterate over areas in which this host occurs.
-        #     """
-        #     for area_idx in self.current_distribution_bitvector:
-        #         if self.current_distribution_bitvector[area_idx] == 1:
-        #             yield self.host_system.areas[area_idx]
-
-        # def add_area(self, area_idx):
-        #     self.current_distribution_bitvector[area_idx] = 1
-
-        # def remove_area(self, area_idx):
-        #     self.current_distribution_bitvector[area_idx] = 0
-
-        # def has_area(self, area_idx):
-        #     return self.current_distribution_bitvector[area_idx] == 1
-
-    def __init__(self, host_regime):
-        self.compile(host_regime)
-
-    def compile(self, host_regime):
+    def compile(self, host_regime, debug_mode=False):
         self.host_regime = host_regime
         self.start_time = self.host_regime.start_time
         self.end_time = self.host_regime.end_time
@@ -387,9 +419,10 @@ class HostSystem(object):
         self.host_lineages = set()
         self.host_lineages_by_id = {}
         for host_regime_lineage_id_definition in self.host_regime.lineages.values():
-            host = HostSystem.HostLineage(
+            host = HostLineage(
                     host_regime_lineage_definition=host_regime_lineage_id_definition,
                     host_system=self,
+                    debug_mode=debug_mode,
                     )
             self.host_lineages.add(host)
             self.host_lineages_by_id[host.lineage_id] = host
@@ -405,16 +438,18 @@ class HostSystem(object):
                 lineages.add(host)
         return lineages
 
-class Area(object):
+    def debug_check(self):
+        for host_lineage in self.host_lineages:
+            host_lineage.debug_check()
+            for area in host_lineage._current_areas:
+                assert area in self.areas
+        for event in self.host_events:
+            area_idx = event.area_idx
+            if area_idx is None:
+                continue
+            assert area_idx in self.areas_by_index, area_idx
+            assert self.areas_by_index[area_idx].area_idx == area_idx
 
-    """
-    Manages the state of an area during a particular simulation replicate.
-    """
-
-    def __init__(self, area_idx):
-        self.area_idx = area_idx
-        self.host_lineages = set()
-        self.symbiont_lineages = set()
 
 class SymbiontHostAreaDistribution(object):
     """
@@ -582,6 +617,7 @@ class SymbiontPhylogeny(dendropy.Tree):
         if kwargs:
             self.model = kwargs.pop("model")
             self.model_id = self.model.model_id
+            self.host_system = kwargs.pop("host_system")
             self.annotations.add_bound_attribute("model_id")
             self.rng = kwargs.pop("rng")
             self.debug_mode = kwargs.pop("debug_mode")
@@ -610,7 +646,7 @@ class SymbiontPhylogeny(dendropy.Tree):
     def new_symbiont_host_area_distribution(self, symbiont_lineage=None):
         dm = SymbiontHostAreaDistribution(
                 symbiont_lineage=symbiont_lineage,
-                host_system=self.model.host_system)
+                host_system=self.host_system)
         return dm
 
     def seed_symbiont_host_area_distribution(self, symbiont_lineage=None):
@@ -620,7 +656,7 @@ class SymbiontPhylogeny(dendropy.Tree):
         # current logic, single lineage occupying all hosts and areas at the
         # beginning of the simulation
         dm = self.new_symbiont_host_area_distribution(symbiont_lineage=symbiont_lineage)
-        extant_host_lineages = self.model.host_system.extant_host_lineages_at_current_time(0)
+        extant_host_lineages = self.host_system.extant_host_lineages_at_current_time(0)
         for host_lineage in extant_host_lineages:
             dm.add_host_area(host_lineage=host_lineage)
         return dm
@@ -860,7 +896,7 @@ class InphestModel(object):
             run_logger.info("Setting up model with identifier: '{}'".format(self.model_id))
 
         # host regime
-        self.host_system = HostSystem(host_regime)
+        self.host_regime = host_regime
 
         # Diversification
 
@@ -998,7 +1034,8 @@ class InphestModel(object):
             run_logger.info("(CLADOGENETIC GEOGRAPHICAL RANGE EVOLUTION) Base weight of widespread vicariance speciation mode: {}".format(self.cladogenesis_widespread_vicariance_speciation_weight))
             run_logger.info("(CLADOGENETIC GEOGRAPHICAL RANGE EVOLUTION) Base weight of founder event speciation ('jump dispersal') mode: {} (note that the effective weight of this event for each lineage is actually the product of this and the lineage-specific area gain weight)".format(self.cladogenesis_founder_event_speciation_weight))
 
-        self.max_time = self.host_system.end_time
+        termination_conditions_d = dict(model_definition.pop("termination_conditions", {}))
+        self.max_time = termination_conditions_d.pop("max_time", 1000)
         desc = "Simulation will terminate at time t = {}".format(self.max_time)
         if run_logger is not None:
             run_logger.info(desc)
