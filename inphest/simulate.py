@@ -384,7 +384,6 @@ class InphestSimulator(object):
             area = self.host_system.areas_by_index[host_event.area_idx]
             host_lineage.add_area(area)
         elif host_event.event_type == "anagenesis" and host_event.event_subtype == "area_loss":
-            print("Losing area {} from: {}".format(host_event.area_idx, host_lineage._current_areas))
             area = self.host_system.areas_by_index[host_event.area_idx]
             host_lineage.remove_area(area)
             for lineage in self.phylogeny.iterate_current_lineages():

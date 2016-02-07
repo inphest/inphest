@@ -170,9 +170,8 @@ class RevBayesBiogeographyParser(object):
                     else:
                         event_time1 = nd.parent_node.time + (nd.edge.length - (event["age"] - nd.age))
                         event_time2 = nd.parent_node.time + (event["time"] * nd.edge.length)
-                        assert (event_time1 - event_time2) <= 1e-2, "{} != {}".format(event_time1, event_time2)
+                        assert abs(event_time1 - event_time2) <= 1e-2, "{} != {}".format(event_time1, event_time2)
                         event_entry["time"] = event_time1
-
                         try:
                             self.max_event_times[tree_idx] = max(event_entry["time"], self.max_event_times[tree_idx])
                         except KeyError:

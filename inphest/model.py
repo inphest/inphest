@@ -215,11 +215,10 @@ class HostRegime(object):
     def compile(self, start_time, end_time):
         self.start_time = start_time
         self.end_time = end_time
-        self.events.sort(key=lambda x: x.event_time)
+        self.events.sort(key=lambda x: x.event_time, reverse=False)
         for event in self.events:
             assert event.event_time >= self.start_time
             assert event.event_time <= self.end_time, "{} > {}".format(event.event_time, self.end_time)
-        # print(self.events)
 
     def validate(self):
         lineage_events = collections.defaultdict(list)
@@ -227,19 +226,26 @@ class HostRegime(object):
             lineage_events[event.lineage_id].append(event)
         for lineage_id in lineage_events:
             distribution_bitlist = list(self.lineages[lineage_id].lineage_start_distribution_bitstring)
-            for event in lineage_events[event.lineage_id]:
+            lineage_events[event.lineage_id].sort(key=lambda x: x.event_time, reverse=False)
+            for event in lineage_events[lineage_id]:
+                assert event.event_time >= self.lineages[lineage_id].lineage_start_time
+                assert event.event_time <= self.lineages[lineage_id].lineage_end_time
                 if event.event_type == "anagenesis" and event.event_subtype == "area_gain":
-                    assert distribution_bitlist[event.area_idx] == "0", "Trying to add area with index {} to distribution that already has area: {}".format(
+                    assert distribution_bitlist[event.area_idx] == "0", "Lineage {} at time {}: Trying to add area with index {} to distribution that already has area: {}".format(
+                            lineage_id,
+                            event.event_time,
                             event.area_idx,
                             "".join(distribution_bitlist))
                     distribution_bitlist[event.area_idx] == "1"
                 elif event.event_type == "anagenesis" and event.event_subtype == "area_loss":
-                    assert distribution_bitlist[event.area_idx] == "1", "Trying to remove area with index {} from distribution that does not have area: {}".format(
+                    assert distribution_bitlist[event.area_idx] == "1", "Lineage {} at time {}: Trying to remove area with index {} from distribution that does not have area: {}".format(
+                            lineage_id,
+                            event.event_time,
                             event.area_idx,
                             "".join(distribution_bitlist))
                     distribution_bitlist[event.area_idx] == "0"
                 elif event.event_type == "cladogenesis":
-                    pass
+                    assert "".join(distribution_bitlist) == self.lineages[lineage_id].lineage_start_distribution_bitstring
 
 class HostRegimeSamples(object):
     """
