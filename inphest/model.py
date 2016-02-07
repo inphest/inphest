@@ -373,10 +373,12 @@ class HostLineage(object):
                 assert presence == "0"
 
     def add_area(self, area):
+        assert area not in self._current_areas
         self._current_areas.add(area)
         area.host_lineages.add(self)
 
     def remove_area(self, area):
+        assert area in self._current_areas
         self._current_areas.remove(area)
         area.host_lineages.remove(self)
 
