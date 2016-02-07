@@ -324,11 +324,10 @@ class HostRegimeSamples(object):
 
         for tree_idx in tree_host_regimes:
             host_regime = tree_host_regimes[tree_idx]
-            # end_time = tree_root_heights[tree_idx]
+            end_time = max(rb.tree_entries[tree_idx]["seed_node_age"], rb.max_event_times[tree_idx])
             host_regime.compile(
                     start_time=0.0,
-                    # end_time=rb.tree_entries[tree_idx]["seed_node_age"],
-                    end_time=rb.max_event_times[tree_idx],
+                    end_time=end_time,
                     )
             if validate:
                 host_regime.validate()
@@ -1151,7 +1150,7 @@ class InphestModel(object):
             run_logger.info("(CLADOGENETIC GEOGRAPHICAL RANGE EVOLUTION) Base weight of founder event speciation ('jump dispersal') mode: {} (note that the effective weight of this event for each lineage is actually the product of this and the lineage-specific area gain weight)".format(self.cladogenesis_founder_event_speciation_weight))
 
         termination_conditions_d = dict(model_definition.pop("termination_conditions", {}))
-        self.max_time = termination_conditions_d.pop("max_time", 1000)
+        self.max_time = termination_conditions_d.pop("max_time", self.host_regime.end_time)
         desc = "Simulation will terminate at time t = {}".format(self.max_time)
         if run_logger is not None:
             run_logger.info(desc)

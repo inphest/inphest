@@ -264,6 +264,8 @@ class InphestSimulator(object):
             self.elapsed_time += time_till_event
             if self.model.max_time and self.elapsed_time > self.model.max_time:
                 self.elapsed_time = self.model.max_time
+                assert len(self.processed_host_events) == len(self.host_system.host_regime.events)
+                assert len(self.host_system.host_events) == 0
                 self.run_logger.info("Termination condition of t = {} reached: storing results and terminating".format(self.elapsed_time))
                 self.store_sample(trees_file=self.trees_file)
                 break

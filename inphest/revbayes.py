@@ -89,8 +89,6 @@ class RevBayesBiogeographyParser(object):
             tree_entry["posterior"] = float(posterior)
             tree_entry["ln_likelihood"] = float(likelihood)
             tree_entry["prior"] = float(prior)
-
-            self.tree_entries.append(tree_entry)
             tree = dendropy.Tree.get(
                     data=tree_str,
                     schema="newick",
@@ -103,7 +101,7 @@ class RevBayesBiogeographyParser(object):
             # print(tree.as_string("newick", suppress_annotations=True))
             tree.calc_node_ages(ultrametricity_precision=0.01)
             tree_entry["seed_node_age"] = tree.seed_node.age
-            # print(tree.seed_node.age)
+            self.tree_entries.append(tree_entry)
 
             for nd in tree:
                 edge_entry = {}
