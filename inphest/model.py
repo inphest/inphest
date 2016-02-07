@@ -703,7 +703,12 @@ class SymbiontHostAreaDistribution(object):
                     assert simulation_elapsed_time < host_lineage.end_time
                 except AssertionError:
                     # until we finish properly processing host events ...
-                    print("!!!!!!!!!!!!!!!! IGNORING EXTINCT HOST CHECK ERROR !!!!!!!!!!!!")
+                    print("!! IGNORING EXTINCT HOST CHECK ERROR: {} ({}): times = {} to {}, current simulation elapsed time = {}".format(
+                        host_lineage.lineage_id,
+                        host_lineage.leafset_bitstring,
+                        host_lineage.start_time,
+                        host_lineage.end_time,
+                        simulation_elapsed_time))
 
 class SymbiontLineage(dendropy.Node):
 
