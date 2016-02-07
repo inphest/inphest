@@ -66,6 +66,10 @@ class InphestSimulator(object):
                 run_logger=self.run_logger,
                 )
 
+        # track host events
+        self.next_host_event = None
+        self.processed_host_events = set()
+
         # initialize phylogeny
         self.phylogeny = model.SymbiontPhylogeny(
                 model=self.model,
@@ -232,19 +236,21 @@ class InphestSimulator(object):
 
             time_till_event = self.rng.expovariate(sum_of_event_rates)
 
-            try:
-                next_host_event = self.host_system.host_events.pop(0)
-            except IndexError: # pop from empty list
-                next_host_event = None
-            if next_host_event and next_host_event.event_time < (self.elapsed_time + time_till_event):
-                time_till_event = next_host_event.event_time - self.elapsed_time
+            if self.next_host_event is None and self.host_system.host_events:
+                try:
+                    self.next_host_event = self.host_system.host_events.pop(0)
+                except IndexError: # pop from empty list
+                    self.next_host_event = None
+            if self.next_host_event and self.next_host_event.event_time < (self.elapsed_time + time_till_event):
+                time_till_event = self.next_host_event.event_time - self.elapsed_time
                 if self.debug_mode:
                     self.run_logger.debug("Host Event {} of {}: {}".format(
                         len(self.host_system.host_regime.events)-len(self.host_system.host_events),
                         len(self.host_system.host_regime.events),
-                        next_host_event))
+                        self.next_host_event))
                 event_f = self.process_host_event
-                event_args = (next_host_event,)
+                event_args = (self.next_host_event,)
+                self.next_host_event = None
             else:
                 event_idx = model.weighted_index_choice(
                         weights=event_rates,
@@ -377,6 +383,7 @@ class InphestSimulator(object):
         return event_calls, event_rates
 
     def process_host_event(self, host_event):
+        assert host_event not in self.processed_host_events
         host_lineage = self.host_system.host_lineages_by_id[host_event.lineage_id]
         assert host_lineage.start_time <= self.elapsed_time
         assert host_lineage.end_time >= self.elapsed_time
@@ -431,6 +438,15 @@ class InphestSimulator(object):
                 # in that area. This will mean in the case of a jump dispersal,
                 # where the daughter lineage goes to a new area, no new
                 # symbiont lineages will be assigned to the host at all.
+
+                # if self.debug_mode:
+                #     for area in lineage_areas_with_host:
+                #         if not ( host_child0_lineage.has_area(area) or host_child1_lineage.has_area(area) ):
+                #             print("Host {:5}, {:10}: {}".format(host_lineage.rb_index, host_lineage.leafset_bitstring, sorted( "{:03}".format(a.area_idx) for a in host_lineage.current_area_iter() )))
+                #             print(" Ch0 {:5}, {:10}: {}".format(host_child0_lineage.rb_index, host_child0_lineage.leafset_bitstring, sorted( "{:03}".format(a.area_idx) for a in host_child0_lineage.current_area_iter() )))
+                #             print(" Ch1 {:5}, {:10}: {}".format(host_child1_lineage.rb_index, host_child1_lineage.leafset_bitstring, sorted( "{:03}".format(a.area_idx) for a in host_child1_lineage.current_area_iter() )))
+                #             print("Symb {}".format(sorted( "{:03}".format(a.area_idx) for a in symbiont_lineage.host_area_distribution.areas_in_host_iter(host_lineage) )))
+
                 for ch_lineage in (host_child0_lineage, host_child1_lineage):
                     for area in ch_lineage.current_area_iter():
                         if area in lineage_areas_with_host:
@@ -441,6 +457,8 @@ class InphestSimulator(object):
 
         if self.debug_mode:
             host_lineage.debug_check()
+
+        self.processed_host_events.add(host_event)
 
     def store_sample(self, trees_file):
         self.write_tree(

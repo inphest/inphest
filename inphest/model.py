@@ -184,6 +184,9 @@ class HostRegime(object):
     HostRegimeLineageDefinition = collections.namedtuple("HostRegimeLineageDefinition", [
         # "tree_idx",                 #   identifer of tree from which this lineage has been sampled (same lineage, as given by split id will occur on different trees/histories)
         "lineage_id",               #   lineage (edge/split) id on which event occurs
+        "leafset_bitstring",
+        "split_bitstring",
+        "rb_index",
         "lineage_start_time",          # time lineage appears
         "lineage_end_time",            # time lineage ends
         "lineage_start_distribution_bitstring",  #   distribution/range (area set) at beginning of lineage
@@ -284,6 +287,9 @@ class HostRegimeSamples(object):
             lineage = HostRegime.HostRegimeLineageDefinition(
                     # tree_idx=edge_entry["tree_idx"],
                     lineage_id=lineage_id,
+                    leafset_bitstring=edge_entry["leafset_bitstring"],
+                    split_bitstring=edge_entry["split_bitstring"],
+                    rb_index=edge_entry["rb_index"],
                     lineage_start_time=edge_entry["edge_start_time"],
                     lineage_end_time=edge_entry["edge_end_time"],
                     lineage_start_distribution_bitstring=edge_entry["edge_starting_state"],
@@ -357,6 +363,9 @@ class HostLineage(object):
         self.host_regime_lineage_definition = host_regime_lineage_definition
         self.host_system = host_system
         self.lineage_id = host_regime_lineage_definition.lineage_id
+        self.leafset_bitstring = host_regime_lineage_definition.leafset_bitstring
+        self.split_bitstring = host_regime_lineage_definition.split_bitstring
+        self.rb_index = host_regime_lineage_definition.rb_index
         self.start_time = host_regime_lineage_definition.lineage_start_time
         self.end_time = host_regime_lineage_definition.lineage_end_time
         self.start_distribution_bitstring = host_regime_lineage_definition.lineage_start_distribution_bitstring
@@ -433,6 +442,7 @@ class HostSystem(object):
             for host_lineage in self.host_lineages:
                 self.check_lineage_distributions[host_lineage] = list(host_lineage.start_distribution_bitstring)
                 self.debug_check_initial_distribution(host_lineage)
+        self._next_host_event = None
 
     def compile(self, host_regime, debug_mode=False):
         self.host_regime = host_regime

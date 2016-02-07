@@ -136,6 +136,7 @@ class RevBayesBiogeographyParser(object):
                         edge_entry["child{}_edge_id".format(ch_idx)] = int(ch.edge.bipartition)
                 edge_metadata, edge_events = self._extract_comment_metadata(nd)
                 # edge_entry["edge_revbayes_index"] = edge_metadata["index"]
+                edge_entry["rb_index"] = edge_metadata["index"]
                 edge_entry["edge_starting_state"] = edge_metadata["pa"]
                 edge_entry["edge_ending_state"] = edge_metadata["nd"]
                 if "cs" in edge_metadata:
@@ -210,7 +211,7 @@ class RevBayesBiogeographyParser(object):
                         self.event_schedules_by_tree[tree] = [split_event]
                     _debug_edge_events.append(split_event)
 
-                # print("--- edge: {} ---".format(nd.edge.bipartition.leafset_as_bitstring()))
+                # print("--- edge {}: {} ---".format(edge_entry["rb_index"], nd.edge.bipartition.leafset_as_bitstring()))
                 # print("times: {} to {}".format(edge_entry["edge_start_time"], edge_entry["edge_end_time"]))
                 # _debug_edge_events.sort(key=lambda e: e["time"])
                 # event_times = [e["time"] for e in _debug_edge_events]
