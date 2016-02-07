@@ -381,10 +381,16 @@ class InphestSimulator(object):
         if self.debug_mode:
             host_lineage.debug_check()
         if host_event.event_type == "anagenesis" and host_event.event_subtype == "area_gain":
-            area = self.host_system.areas_by_index[host_event.area_idx]
+            if self.debug_mode:
+                assert self.host_system.check_lineage_distributions[host_lineage][host_event.area_idx] == "0"
+                self.host_system.check_lineage_distributions[host_lineage][host_event.area_idx] = "1"
+            area = self.host_system.areas[host_event.area_idx]
             host_lineage.add_area(area)
         elif host_event.event_type == "anagenesis" and host_event.event_subtype == "area_loss":
-            area = self.host_system.areas_by_index[host_event.area_idx]
+            if self.debug_mode:
+                assert self.host_system.check_lineage_distributions[host_lineage][host_event.area_idx] == "1"
+                self.host_system.check_lineage_distributions[host_lineage][host_event.area_idx] = "0"
+            area = self.host_system.areas[host_event.area_idx]
             host_lineage.remove_area(area)
             for lineage in self.phylogeny.iterate_current_lineages():
                 if lineage.host_area_distribution.has_host_area(host_lineage, area):

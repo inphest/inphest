@@ -423,6 +423,19 @@ class HostSystem(object):
             run_logger=None):
         self.debug_mode = debug_mode
         self.compile(host_regime, debug_mode=debug_mode)
+        if self.debug_mode:
+            ## check initial distributions ##
+            self.check_lineage_distributions = {}
+            for host_lineage in self.host_lineages:
+                self.check_lineage_distributions[host_lineage] = list(host_lineage.start_distribution_bitstring)
+                for area_idx, presence in enumerate(self.check_lineage_distributions[host_lineage]):
+                    if presence == "1":
+                        assert self.areas[area_idx] in host_lineage._current_areas
+
+                    elif presence == "0":
+                        assert self.areas[area_idx] not in host_lineage._current_areas
+                    else:
+                        raise ValueError
 
     def compile(self, host_regime, debug_mode=False):
         self.host_regime = host_regime
@@ -437,12 +450,11 @@ class HostSystem(object):
             assert num_areas == len(host_regime_lineage_id_definition.lineage_start_distribution_bitstring)
             assert num_areas == len(host_regime_lineage_id_definition.lineage_end_distribution_bitstring)
         self.num_areas = num_areas
-        self.areas = set()
-        self.areas_by_index = {}
+        self.areas = []
         for area_idx in range(self.num_areas):
             area = Area(area_idx)
-            self.areas.add(area)
-            self.areas_by_index[area_idx] = area
+            self.areas.append(area)
+
         # self.area_host_symbiont_host_area_distribution = {}
         # for area in self.areas:
         #     self.area_host_symbiont_host_area_distribution[area] = {}
@@ -481,8 +493,7 @@ class HostSystem(object):
             area_idx = event.area_idx
             if area_idx is None:
                 continue
-            assert area_idx in self.areas_by_index, area_idx
-            assert self.areas_by_index[area_idx].area_idx == area_idx
+            assert self.areas[area_idx].area_idx == area_idx
 
 
 class SymbiontHostAreaDistribution(object):
