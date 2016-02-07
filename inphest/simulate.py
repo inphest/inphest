@@ -377,7 +377,7 @@ class InphestSimulator(object):
         return event_calls, event_rates
 
     def process_host_event(self, host_event):
-        host_lineage =self.host_system.host_lineages_by_id[host_event.lineage_id]
+        host_lineage = self.host_system.host_lineages_by_id[host_event.lineage_id]
         assert host_lineage.start_time <= self.elapsed_time
         assert host_lineage.end_time >= self.elapsed_time
         if self.debug_mode:
@@ -386,22 +386,59 @@ class InphestSimulator(object):
             if self.debug_mode:
                 assert self.host_system.check_lineage_distributions[host_lineage][host_event.area_idx] == "0"
                 self.host_system.check_lineage_distributions[host_lineage][host_event.area_idx] = "1"
+                self.run_logger.debug("Host lineage {}: anagenetic gain of area with index {}: {}".format(host_lineage.lineage_id, host_event.area_idx, self.host_system.check_lineage_distributions[host_lineage]))
             area = self.host_system.areas[host_event.area_idx]
             host_lineage.add_area(area)
         elif host_event.event_type == "anagenesis" and host_event.event_subtype == "area_loss":
             if self.debug_mode:
                 assert self.host_system.check_lineage_distributions[host_lineage][host_event.area_idx] == "1"
                 self.host_system.check_lineage_distributions[host_lineage][host_event.area_idx] = "0"
+                self.run_logger.debug("Host lineage {}: anagenetic loss of area with index {}: {}".format(host_lineage.lineage_id, host_event.area_idx, self.host_system.check_lineage_distributions[host_lineage]))
             area = self.host_system.areas[host_event.area_idx]
-            for lineage in self.phylogeny.iterate_current_lineages():
-                if lineage.host_area_distribution.has_host_in_area(host_lineage, area):
+            for symbiont_lineage in self.phylogeny.iterate_current_lineages():
+                if symbiont_lineage.host_area_distribution.has_host_in_area(host_lineage, area):
                     try:
-                        lineage.host_area_distribution.remove_host_in_area(host_lineage, area)
+                        symbiont_lineage.host_area_distribution.remove_host_in_area(host_lineage, area)
                     except model.SymbiontHostAreaDistribution.NullDistributionException:
-                        self.phylogeny.extinguish_lineage(lineage)
+                        self.phylogeny.extinguish_lineage(symbiont_lineage)
             host_lineage.remove_area(area)
         elif host_event.event_type == "cladogenesis":
-            pass
+            host_child0_lineage = self.host_system.host_lineages_by_id[host_event.child0_lineage_id]
+            host_child1_lineage = self.host_system.host_lineages_by_id[host_event.child1_lineage_id]
+            if self.debug_mode:
+                assert host_child0_lineage.lineage_id == host_event.child0_lineage_id
+                assert host_child1_lineage.lineage_id == host_event.child1_lineage_id
+                self.run_logger.debug("Host lineage {} ({}): splitting into lineages {} ({}) and {} ({})".format(
+                    host_lineage.lineage_id,
+                    self.host_system.check_lineage_distributions[host_lineage],
+                    host_event.child0_lineage_id,
+                    self.host_system.check_lineage_distributions[host_child0_lineage],
+                    host_event.child1_lineage_id,
+                    self.host_system.check_lineage_distributions[host_child1_lineage],
+                    ))
+                for ch_lineage in (host_child0_lineage, host_child1_lineage):
+                    assert ch_lineage.start_time <= self.elapsed_time
+                    assert ch_lineage.end_time >= self.elapsed_time
+                    self.host_system.debug_check_initial_distribution(ch_lineage)
+            for symbiont_lineage in self.phylogeny.iterate_current_lineages():
+                if not symbiont_lineage.host_area_distribution.has_host(host_lineage):
+                    continue
+                lineage_areas_with_host = set(symbiont_lineage.host_area_distribution.areas_in_host_iter(host_lineage))
+                hosts_in_areas_added = 0
+                ## TODO: need to special case jump dispersal event subtype
+                # The following scheme assigns a symbiont to a new daughter
+                # host lineage in an area if the symbiont occupied the parent
+                # in that area. This will mean in the case of a jump dispersal,
+                # where the daughter lineage goes to a new area, no new
+                # symbiont lineages will be assigned to the host at all.
+                for ch_lineage in (host_child0_lineage, host_child1_lineage):
+                    for area in ch_lineage.current_area_iter():
+                        if area in lineage_areas_with_host:
+                            symbiont_lineage.host_area_distribution.add_host_in_area(host_lineage=ch_lineage, area=area)
+                            hosts_in_areas_added += 1
+                assert hosts_in_areas_added > 0
+                symbiont_lineage.host_area_distribution.remove_host(host_lineage)
+
         if self.debug_mode:
             host_lineage.debug_check()
 

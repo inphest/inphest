@@ -428,18 +428,11 @@ class HostSystem(object):
         self.debug_mode = debug_mode
         self.compile(host_regime, debug_mode=debug_mode)
         if self.debug_mode:
-            ## check initial distributions ##
+            ## setup for checking initial distributions ##
             self.check_lineage_distributions = {}
             for host_lineage in self.host_lineages:
                 self.check_lineage_distributions[host_lineage] = list(host_lineage.start_distribution_bitstring)
-                for area_idx, presence in enumerate(self.check_lineage_distributions[host_lineage]):
-                    if presence == "1":
-                        assert self.areas[area_idx] in host_lineage._current_areas
-
-                    elif presence == "0":
-                        assert self.areas[area_idx] not in host_lineage._current_areas
-                    else:
-                        raise ValueError
+                self.debug_check_initial_distribution(host_lineage)
 
     def compile(self, host_regime, debug_mode=False):
         self.host_regime = host_regime
@@ -499,6 +492,15 @@ class HostSystem(object):
                 continue
             assert self.areas[area_idx].area_idx == area_idx
 
+    def debug_check_initial_distribution(self, host_lineage):
+        for area_idx, presence in enumerate(self.check_lineage_distributions[host_lineage]):
+            if presence == "1":
+                assert self.areas[area_idx] in host_lineage._current_areas
+            elif presence == "0":
+                assert self.areas[area_idx] not in host_lineage._current_areas
+            else:
+                raise ValueError
+
 
 class SymbiontHostAreaDistribution(object):
     """
@@ -549,31 +551,71 @@ class SymbiontHostAreaDistribution(object):
         Otherwise, all hosts (of the given lineage) of all areas are removed from the range.
         """
         if area is None:
-            for area in host_lineage.current_area_iter():
-                self._host_area_distribution[host_lineage][area] = 0
-            self._infected_hosts.remove(host_lineage)
-            for other_area in self.host_system.areas:
-                if self._host_area_distribution[host_lineage][other_area] == 1:
-                    break
-            else:
-                self._infected_areas.remove(area)
-                area.symbiont_lineages.remove(self.symbiont_lineage)
+            self.remove_host(host_lineage)
         else:
             assert host_lineage.has_area(area), "{} not in host area: {}".format(area, host_lineage._current_areas)
             self._host_area_distribution[host_lineage][area] = 0
-            for other_host_lineage in self.host_system.host_lineages:
-                if self._host_area_distribution[other_host_lineage][area] == 1:
-                    break
-            else:
-                self._infected_hosts.remove(host_lineage)
-            for other_area in self.host_system.areas:
-                if self._host_area_distribution[host_lineage][other_area] == 1:
-                    break
-            else:
-                self._infected_areas.remove(area)
-                area.symbiont_lineages.remove(self.symbiont_lineage)
-            if not self._infected_hosts or not self._infected_areas:
-                raise SymbiontHostAreaDistribution.NullDistributionException()
+            self.sync_area_cache(area)
+            self.sync_host_cache(host_lineage)
+            self.check_for_null_distribution()
+
+    def remove_host(self, host_lineage):
+        """
+        Removes association with host from all areas.
+        """
+        for area in host_lineage.current_area_iter():
+            if self._host_area_distribution[host_lineage][area] > 0:
+                self._host_area_distribution[host_lineage][area] = 0
+                self.sync_area_cache(area)
+        self._infected_hosts.remove(host_lineage)
+        self.check_for_null_distribution()
+
+    def sync_area_cache(self, area, search_all_hosts=False):
+        """
+        Check if symbiont occurs in any host in the given area.
+        If not, remove association with area.
+        Otherwise, add it.
+        If ``search_all_hosts`` is True, then all hosts in the system will be searched.
+        Otherwise, only hosts known to be associated with this area will be searched.
+        """
+        if search_all_hosts:
+            host_lineage_iter = iter(self.host_system.host_lineages)
+        else:
+            host_lineage_iter = iter(area.host_lineages)
+        for host_lineage in area.host_lineages:
+            if self._host_area_distribution[host_lineage][area] == 1:
+                self._infected_areas.add(area)
+                area.symbiont_lineages.add(self.symbiont_lineage)
+                break
+        else:
+            self._infected_areas.remove(area)
+            area.symbiont_lineages.remove(self.symbiont_lineage)
+
+    def sync_host_cache(self, host_lineage, search_all_areas=False):
+        """
+        Check if symbiont occurs in the given host in any of its areas.
+        If not, remove association with host.
+        Otherwise, add it.
+        If ``search_all_areas`` is True, then all areas in the system will be searched.
+        Otherwise, only areas known to be associated with this host will be searched.
+        """
+        if search_all_areas:
+            area_iter = iter(self.host_system.areas)
+        else:
+            area_iter = host_lineage.current_area_iter()
+        for area in area_iter:
+            if self._host_area_distribution[host_lineage][area] == 1:
+                self._infected_hosts.add(host_lineage)
+                break
+        else:
+            self._infected_hosts.remove(host_lineage)
+
+    def check_for_null_distribution(self):
+        """
+        Ensures that lineage occurs at least in one host in one area.
+        """
+        if not self._infected_hosts or not self._infected_areas:
+            raise SymbiontHostAreaDistribution.NullDistributionException()
 
     def has_host(self, host_lineage):
         """
@@ -600,6 +642,16 @@ class SymbiontHostAreaDistribution(object):
         """
         for area in self._infected_areas:
             yield area
+
+    def areas_in_host_iter(self, host_lineage):
+        """
+        Iterates over areas in which lineage is associated with a particular host.
+        """
+        for area in self._host_area_distribution[host_lineage]:
+            if self._host_area_distribution[host_lineage][area] == 1:
+                yield area
+            else:
+                assert self._host_area_distribution[host_lineage][area] == 0
 
     def has_area(self, area):
         """
