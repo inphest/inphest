@@ -378,6 +378,8 @@ class InphestSimulator(object):
 
     def process_host_event(self, host_event):
         host_lineage =self.host_system.host_lineages_by_id[host_event.lineage_id]
+        assert host_lineage.start_time <= self.elapsed_time
+        assert host_lineage.end_time >= self.elapsed_time
         if self.debug_mode:
             host_lineage.debug_check()
         if host_event.event_type == "anagenesis" and host_event.event_subtype == "area_gain":
