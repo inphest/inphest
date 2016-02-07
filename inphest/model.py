@@ -221,6 +221,26 @@ class HostRegime(object):
             assert event.event_time <= self.end_time, "{} > {}".format(event.event_time, self.end_time)
         # print(self.events)
 
+    def validate(self):
+        lineage_events = collections.defaultdict(list)
+        for event in self.events:
+            lineage_events[event.lineage_id].append(event)
+        for lineage_id in lineage_events:
+            distribution_bitlist = list(self.lineages[lineage_id].lineage_start_distribution_bitstring)
+            for event in lineage_events[event.lineage_id]:
+                if event.event_type == "anagenesis" and event.event_subtype == "area_gain":
+                    assert distribution_bitlist[event.area_idx] == "0", "Trying to add area with index {} to distribution that already has area: {}".format(
+                            event.area_idx,
+                            "".join(distribution_bitlist))
+                    distribution_bitlist[event.area_idx] == "1"
+                elif event.event_type == "anagenesis" and event.event_subtype == "area_loss":
+                    assert distribution_bitlist[event.area_idx] == "1", "Trying to remove area with index {} from distribution that does not have area: {}".format(
+                            event.area_idx,
+                            "".join(distribution_bitlist))
+                    distribution_bitlist[event.area_idx] == "0"
+                elif event.event_type == "cladogenesis":
+                    pass
+
 class HostRegimeSamples(object):
     """
     A collection of host histories, one a single one of each a particular symbiont history will be conditioned.
@@ -230,7 +250,10 @@ class HostRegimeSamples(object):
         self.host_regimes = []
         self.taxon_namespace = dendropy.TaxonNamespace()
 
-    def parse_host_biogeography(self, src):
+    def parse_host_biogeography(self,
+            src,
+            validate=True,
+            ignore_validation_errors=False):
         """
         Reads the output of RevBayes biogeographical history.
         """
@@ -284,14 +307,17 @@ class HostRegimeSamples(object):
                 )
             assert event.lineage_id in tree_host_regimes[tree_idx].lineages
             tree_host_regimes[tree_idx].events.append(event)
+
         for tree_idx in tree_host_regimes:
-            host_regime  = tree_host_regimes[tree_idx]
+            host_regime = tree_host_regimes[tree_idx]
             # end_time = tree_root_heights[tree_idx]
             host_regime.compile(
                     start_time=0.0,
                     # end_time=rb.tree_entries[tree_idx]["seed_node_age"],
                     end_time=rb.max_event_times[tree_idx],
                     )
+            if validate:
+                host_regime.validate()
             self.host_regimes.append(host_regime)
 
 class Area(object):
