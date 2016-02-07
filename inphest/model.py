@@ -364,7 +364,9 @@ class HostLineage(object):
         self.current_distribution_bitstring = host_regime_lineage_definition.lineage_end_distribution_bitstring
         self._current_areas = set()
         assert len(self.host_system.areas) == len(self.start_distribution_bitstring)
-        for area, presence in zip(self.host_system.areas, self.start_distribution_bitstring):
+        for (area_idx, area), (d_idx, presence) in zip(enumerate(self.host_system.areas), enumerate(self.start_distribution_bitstring)):
+            assert area_idx == d_idx
+            assert area.area_idx == area_idx
             if presence == "1":
                 self.add_area(area)
             else:
