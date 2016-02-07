@@ -521,7 +521,7 @@ class SymbiontHostAreaDistribution(object):
         self._infected_hosts = set()
         self._infected_areas = set()
 
-    def add_host_area(self, host_lineage, area=None):
+    def add_host_in_area(self, host_lineage, area=None):
         """
         Adds a host to the distribution.
         If ``area`` is specified, then only the host in a specific area is infected.
@@ -538,7 +538,7 @@ class SymbiontHostAreaDistribution(object):
             area.symbiont_lineages.add(self.symbiont_lineage)
         self._infected_hosts.add(host_lineage)
 
-    def remove_host_area(self, host_lineage, area=None):
+    def remove_host_in_area(self, host_lineage, area=None):
         """
         Removes a host from the distribution.
         If ``area_idx`` is specified, then only the host in that specific area is removed. Otherwise,
@@ -555,7 +555,7 @@ class SymbiontHostAreaDistribution(object):
                 self._infected_areas.remove(area)
                 area.symbiont_lineages.remove(self.symbiont_lineage)
         else:
-            assert host_lineage.has_area(area)
+            assert host_lineage.has_area(area), "{} not in host area: {}".format(area, host_lineage._current_areas)
             self._host_area_distribution[host_lineage][area] = 0
             for other_host_lineage in self.host_system.host_lineages:
                 if self._host_area_distribution[other_host_lineage][area] == 1:
@@ -577,7 +577,7 @@ class SymbiontHostAreaDistribution(object):
         """
         return host_lineage in self._infected_hosts
 
-    def has_host_area(self, host_lineage, area):
+    def has_host_in_area(self, host_lineage, area):
         """
         Returns True if host is infected in a particular area.
         """
@@ -703,7 +703,7 @@ class SymbiontPhylogeny(dendropy.Tree):
         dm = self.new_symbiont_host_area_distribution(symbiont_lineage=symbiont_lineage)
         extant_host_lineages = self.host_system.extant_host_lineages_at_current_time(0)
         for host_lineage in extant_host_lineages:
-            dm.add_host_area(host_lineage=host_lineage)
+            dm.add_host_in_area(host_lineage=host_lineage)
         return dm
 
     def iterate_current_lineages(self):

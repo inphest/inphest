@@ -356,7 +356,7 @@ class InphestSimulator(object):
                 occupied_areas[host_lineage] = []
                 unoccupied_areas[host_lineage] = []
                 for area in host_lineage.current_area_iter():
-                    if lineage.host_area_distribution.has_host_area(host_lineage, area):
+                    if lineage.host_area_distribution.has_host_in_area(host_lineage, area):
                         occupied_areas[host_lineage].append(area)
                     else:
                         unoccupied_areas[host_lineage].append(area)
@@ -391,13 +391,13 @@ class InphestSimulator(object):
                 assert self.host_system.check_lineage_distributions[host_lineage][host_event.area_idx] == "1"
                 self.host_system.check_lineage_distributions[host_lineage][host_event.area_idx] = "0"
             area = self.host_system.areas[host_event.area_idx]
-            host_lineage.remove_area(area)
             for lineage in self.phylogeny.iterate_current_lineages():
-                if lineage.host_area_distribution.has_host_area(host_lineage, area):
+                if lineage.host_area_distribution.has_host_in_area(host_lineage, area):
                     try:
-                        lineage.host_area_distribution.remove_host_area(host_lineage, area)
+                        lineage.host_area_distribution.remove_host_in_area(host_lineage, area)
                     except model.SymbiontHostAreaDistribution.NullDistributionException:
                         self.phylogeny.extinguish_lineage(lineage)
+            host_lineage.remove_area(area)
         elif host_event.event_type == "cladogenesis":
             pass
         if self.debug_mode:
