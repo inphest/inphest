@@ -587,7 +587,7 @@ def repeat_run(
                     run_logger.info("-inphest- Replicate {} of {}, host regime {} of {}: Completed to termination condition at t = {}".format(current_rep+1, nreps, host_regime_idx+1, len(hrs.host_regimes), inphest_simulator.elapsed_time))
                     num_restarts = 0
                     break
-            current_rep += 1
+        current_rep += 1
 
 if __name__ == "__main__":
     rb_data = os.path.join(utility.TEST_DATA_PATH, "revbayes", "bg_large.events.txt")
@@ -600,6 +600,7 @@ if __name__ == "__main__":
         config_d=None,
         interpolate_missing_model_values=False,
         random_seed=None,
+        # random_seed=8362494661840971834,
         stderr_logging_level="info",
         file_logging_level="debug",
         maximum_num_restarts_per_replicates=100,
