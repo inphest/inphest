@@ -714,7 +714,7 @@ class SymbiontPhylogeny(dendropy.Tree):
         pass
 
     def extinguish_lineage(self, lineage):
-        pass
+        self._make_lineage_extinct_on_phylogeny(lineage)
 
     def expand_lineage_host_set(self, lineage):
         pass
