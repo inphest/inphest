@@ -630,6 +630,10 @@ def repeat_run(
 
 if __name__ == "__main__":
     rb_data = os.path.join(utility.TEST_DATA_PATH, "revbayes", "bg_large.events.txt")
+    if len(sys.argv) > 1:
+        random_seed = int(sys.argv[1])
+    else:
+        random_seed = None
     repeat_run(
         output_prefix="test",
         nreps=1,
@@ -638,7 +642,7 @@ if __name__ == "__main__":
         model_definition_type="python-dict",
         config_d=None,
         interpolate_missing_model_values=False,
-        random_seed=None,
+        random_seed=random_seed,
         stderr_logging_level="info",
         file_logging_level="debug",
         maximum_num_restarts_per_replicates=100,
@@ -654,3 +658,4 @@ if __name__ == "__main__":
     #             model_definition_source={},
     #             model_definition_type="python-dict",
     #             )
+
