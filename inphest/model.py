@@ -221,6 +221,8 @@ class HostRegime(object):
             assert event.event_time <= self.end_time, "{} > {}".format(event.event_time, self.end_time)
 
     def validate(self):
+        ## Basically, runs through the histories for each edge/lineage,
+        ## ensuring the history correctly reproduces the end state given the start state
         lineage_events = collections.defaultdict(list)
         for event in self.events:
             lineage_events[event.lineage_id].append(event)
