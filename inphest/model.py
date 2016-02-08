@@ -741,28 +741,25 @@ class SymbiontPhylogeny(dendropy.Tree):
     node_factory = classmethod(node_factory)
 
     def __init__(self, *args, **kwargs):
-        if kwargs:
-            self.model = kwargs.pop("model")
-            self.model_id = self.model.model_id
-            self.host_system = kwargs.pop("host_system")
-            self.annotations.add_bound_attribute("model_id")
-            self.rng = kwargs.pop("rng")
-            self.debug_mode = kwargs.pop("debug_mode")
-            self.run_logger = kwargs.pop("run_logger")
-            self.lineage_indexer = utility.IndexGenerator(0)
-            if "seed_node" not in kwargs:
-                seed_node = self.node_factory(
-                        index=next(self.lineage_indexer),
-                        host_system=self.host_system,
-                        )
-                kwargs["seed_node"] = seed_node
-            dendropy.Tree.__init__(self, *args, **kwargs)
-            self.current_lineages = set([self.seed_node])
-            extant_host_lineages = self.host_system.extant_host_lineages_at_current_time(0)
-            for host_lineage in extant_host_lineages:
-                self.seed_node.host_area_distribution.add_host_in_area(host_lineage=host_lineage)
-        else:
-            dendropy.Tree.__init__(self, *args, **kwargs)
+        self.model = kwargs.pop("model")
+        self.model_id = self.model.model_id
+        self.host_system = kwargs.pop("host_system")
+        self.annotations.add_bound_attribute("model_id")
+        self.rng = kwargs.pop("rng")
+        self.debug_mode = kwargs.pop("debug_mode")
+        self.run_logger = kwargs.pop("run_logger")
+        self.lineage_indexer = utility.IndexGenerator(0)
+        if "seed_node" not in kwargs:
+            seed_node = self.node_factory(
+                    index=next(self.lineage_indexer),
+                    host_system=self.host_system,
+                    )
+            kwargs["seed_node"] = seed_node
+        dendropy.Tree.__init__(self, *args, **kwargs)
+        self.current_lineages = set([self.seed_node])
+        extant_host_lineages = self.host_system.extant_host_lineages_at_current_time(0)
+        for host_lineage in extant_host_lineages:
+            self.seed_node.host_area_distribution.add_host_in_area(host_lineage=host_lineage)
 
     def __deepcopy__(self, memo=None):
         if memo is None:
