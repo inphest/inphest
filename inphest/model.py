@@ -1048,8 +1048,8 @@ class InphestModel(object):
         else:
             self.symbiont_lineage_birth_rate_function = RateFunction(
                     definition_type="lambda_definition",
-                    definition_content="lambda symbiont_lineage: 0.01",
-                    description="fixed: 0.01",
+                    definition_content="lambda symbiont_lineage: 0.04",
+                    description="fixed: 0.04",
                     )
         if run_logger is not None:
             run_logger.info("(DIVERSIFICATION) Setting symbiont lineage-specific birth rate function: {desc}".format(
@@ -1083,8 +1083,8 @@ class InphestModel(object):
         else:
             self.symbiont_lineage_host_gain_rate_function = RateFunction(
                     definition_type="lambda_definition",
-                    definition_content="lambda symbiont_lineage: 0.01",
-                    description="fixed: 0.01",
+                    definition_content="lambda symbiont_lineage: 0.04",
+                    description="fixed: 0.04",
                     )
         if run_logger is not None:
             run_logger.info("(ANAGENETIC HOST RANGE EVOLUTION) Setting symbiont lineage-specific host gain weight function: {desc}".format(
