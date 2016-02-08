@@ -510,8 +510,7 @@ class HostSystem(object):
             else:
                 raise ValueError
 
-
-class SymbiontHostAreaDistribution(object):
+class SymbiontLineage(dendropy.Node):
     """
     Manages the host-by-area distribution of a single symbiont lineage.
     """
@@ -519,13 +518,15 @@ class SymbiontHostAreaDistribution(object):
     class NullDistributionException(Exception):
         pass
 
-    def __init__(self, symbiont_lineage, host_system):
-        self.symbiont_lineage = symbiont_lineage
+    def __init__(self, index, host_system):
+
+        dendropy.Node.__init__(self)
+        self.index = index
         self.host_system = host_system
+        self.is_extant = True
+        self.edge.length = 0
 
-        ## distribution set: tuples of (host_lineage_id, area_idx)
-        # self._host_area_distribution = set()
-
+        # distribution tracking/management
         self._host_area_distribution = {}
         for host_lineage in self.host_system.host_lineages:
             self._host_area_distribution[host_lineage] = {}
@@ -545,12 +546,12 @@ class SymbiontHostAreaDistribution(object):
         if area is None:
             for area in host_lineage.current_area_iter():
                 self._host_area_distribution[host_lineage][area] = 1
-                area.symbiont_lineages.add(self.symbiont_lineage)
+                area.symbiont_lineages.add(self)
                 self._infected_areas.add(area)
         else:
             assert host_lineage.has_area(area)
             self._host_area_distribution[host_lineage][area] = 1
-            area.symbiont_lineages.add(self.symbiont_lineage)
+            area.symbiont_lineages.add(self)
         self._infected_hosts.add(host_lineage)
 
     def remove_host_in_area(self, host_lineage, area=None):
@@ -594,11 +595,11 @@ class SymbiontHostAreaDistribution(object):
         for host_lineage in area.host_lineages:
             if self._host_area_distribution[host_lineage][area] == 1:
                 self._infected_areas.add(area)
-                area.symbiont_lineages.add(self.symbiont_lineage)
+                area.symbiont_lineages.add(self)
                 break
         else:
             self._infected_areas.remove(area)
-            area.symbiont_lineages.remove(self.symbiont_lineage)
+            area.symbiont_lineages.remove(self)
 
     def sync_host_cache(self, host_lineage, search_all_areas=False):
         """
@@ -624,7 +625,7 @@ class SymbiontHostAreaDistribution(object):
         Ensures that lineage occurs at least in one host in one area.
         """
         if not self._infected_hosts or not self._infected_areas:
-            raise SymbiontHostAreaDistribution.NullDistributionException()
+            raise SymbiontLineage.NullDistributionException()
 
     def has_host(self, host_lineage):
         """
@@ -694,7 +695,7 @@ class SymbiontHostAreaDistribution(object):
                     infected_hosts.add(host_lineage)
                     infected_areas.add(area)
                     assert host_lineage in area.host_lineages
-                    assert self.symbiont_lineage in area.symbiont_lineages
+                    assert self in area.symbiont_lineages
                     noninfected_areas.discard(area)
                     noninfected_hosts.discard(host_lineage)
                     occurrences += 1
@@ -705,7 +706,7 @@ class SymbiontHostAreaDistribution(object):
         assert infected_hosts == self._infected_hosts
         assert infected_areas == self._infected_areas
         for area in noninfected_areas:
-            assert self.symbiont_lineage not in area.symbiont_lineages
+            assert self not in area.symbiont_lineages
         # check that the infected hosts are supposed to exist at the current time
         if simulation_elapsed_time is not None:
             for host_lineage in self._infected_hosts:
@@ -720,19 +721,6 @@ class SymbiontHostAreaDistribution(object):
                         host_lineage.start_time,
                         host_lineage.end_time,
                         simulation_elapsed_time))
-
-class SymbiontLineage(dendropy.Node):
-
-    def __init__(self, index, host_system):
-        dendropy.Node.__init__(self)
-        self.host_system = host_system
-        self.host_area_distribution = SymbiontHostAreaDistribution(
-                symbiont_lineage=self,
-                host_system=self.host_system)
-        self.host_area_distribution.lineage = self
-        self.index = index
-        self.is_extant = True
-        self.edge.length = 0
 
 class SymbiontPhylogeny(dendropy.Tree):
 
@@ -759,7 +747,7 @@ class SymbiontPhylogeny(dendropy.Tree):
         self.current_lineages = set([self.seed_node])
         extant_host_lineages = self.host_system.extant_host_lineages_at_current_time(0)
         for host_lineage in extant_host_lineages:
-            self.seed_node.host_area_distribution.add_host_in_area(host_lineage=host_lineage)
+            self.seed_node.add_host_in_area(host_lineage=host_lineage)
 
     def __deepcopy__(self, memo=None):
         if memo is None:
@@ -1248,8 +1236,6 @@ class InphestModel(object):
         d["gsa_termination_focal_area_lineages"] = self.gsa_termination_focal_area_lineages
         d["max_time"] = self.max_time
         return d
-
-
 
 if __name__ == "__main__":
     hrs = HostRegimeSamples()

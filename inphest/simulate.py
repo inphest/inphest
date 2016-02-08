@@ -214,7 +214,7 @@ class InphestSimulator(object):
                 self.phylogeny._debug_check_tree()
                 for lineage in self.phylogeny.current_lineages:
                     assert lineage.is_extant
-                    lineage.host_area_distribution.debug_check(simulation_elapsed_time=self.elapsed_time)
+                    lineage.debug_check(simulation_elapsed_time=self.elapsed_time)
 
             ### LOGGING
             if self.log_frequency:
@@ -282,7 +282,7 @@ class InphestSimulator(object):
                 self.phylogeny._debug_check_tree()
                 for lineage in self.phylogeny.current_lineages:
                     assert lineage.is_extant
-                    lineage.host_area_distribution.debug_check(simulation_elapsed_time=self.elapsed_time)
+                    lineage.debug_check(simulation_elapsed_time=self.elapsed_time)
 
             # if self.model.gsa_termination_focal_area_lineages and ntips_in_focal_areas >= self.model.gsa_termination_focal_area_lineages:
             #     # select/process one of the previously stored snapshots, write to final results file,
@@ -328,11 +328,11 @@ class InphestSimulator(object):
             ## "global infection rate", i.e., across all host/area.
             infected_hosts = {}
             uninfected_hosts = {}
-            for area in lineage.host_area_distribution.area_iter():
+            for area in lineage.area_iter():
                 infected_hosts[area] = []
                 uninfected_hosts[area] = []
                 for host_lineage in area.host_lineages:
-                    if lineage.host_area_distribution.has_host(host_lineage):
+                    if lineage.has_host(host_lineage):
                         infected_hosts[area].append( host_lineage )
                     else:
                         uninfected_hosts[area].append( host_lineage )
@@ -341,7 +341,7 @@ class InphestSimulator(object):
             per_area_host_infection_rate = self.model.symbiont_lineage_host_gain_rate_function(lineage)
             # If we stick to a per-event infection rate, this loop can, of course,
             # be merged with the previous one.
-            for area in lineage.host_area_distribution.area_iter():
+            for area in lineage.area_iter():
                 for src_host in infected_hosts[area]:
                     for dest_host in uninfected_hosts[area]:
                         event_calls.append( (self.phylogeny.expand_lineage_host_set, (lineage, dest_host, area)) )
@@ -360,15 +360,15 @@ class InphestSimulator(object):
             occupied_areas = {}
             unoccupied_areas = {}
             per_host_area_gain_rate = self.model.symbiont_lineage_area_gain_rate_function(lineage)
-            for host_lineage in lineage.host_area_distribution.host_iter():
+            for host_lineage in lineage.host_iter():
                 occupied_areas[host_lineage] = []
                 unoccupied_areas[host_lineage] = []
                 for area in host_lineage.current_area_iter():
-                    if lineage.host_area_distribution.has_host_in_area(host_lineage, area):
+                    if lineage.has_host_in_area(host_lineage, area):
                         occupied_areas[host_lineage].append(area)
                     else:
                         unoccupied_areas[host_lineage].append(area)
-            for host_lineage in lineage.host_area_distribution.host_iter():
+            for host_lineage in lineage.host_iter():
                 for src_area in occupied_areas[host_lineage]:
                     for dest_area in unoccupied_areas[host_lineage]:
                         event_calls.append( (self.phylogeny.expand_lineage_area_set, (lineage, host_lineage, dest_area)) )
@@ -405,10 +405,10 @@ class InphestSimulator(object):
                 self.run_logger.debug("Host lineage {}: anagenetic loss of area with index {}: {}".format(host_lineage.lineage_id, host_event.area_idx, self.host_system.check_lineage_distributions[host_lineage]))
             area = self.host_system.areas[host_event.area_idx]
             for symbiont_lineage in self.phylogeny.current_lineage_iter():
-                if symbiont_lineage.host_area_distribution.has_host_in_area(host_lineage, area):
+                if symbiont_lineage.has_host_in_area(host_lineage, area):
                     try:
-                        symbiont_lineage.host_area_distribution.remove_host_in_area(host_lineage, area)
-                    except model.SymbiontHostAreaDistribution.NullDistributionException:
+                        symbiont_lineage.remove_host_in_area(host_lineage, area)
+                    except model.SymbiontLineage.NullDistributionException:
                         self.phylogeny.extinguish_lineage(symbiont_lineage)
             host_lineage.remove_area(area)
         elif host_event.event_type == "cladogenesis":
@@ -430,9 +430,9 @@ class InphestSimulator(object):
                     assert ch_lineage.end_time >= self.elapsed_time
                     self.host_system.debug_check_initial_distribution(ch_lineage)
             for symbiont_lineage in self.phylogeny.current_lineage_iter():
-                if not symbiont_lineage.host_area_distribution.has_host(host_lineage):
+                if not symbiont_lineage.has_host(host_lineage):
                     continue
-                lineage_areas_with_host = set(symbiont_lineage.host_area_distribution.areas_in_host_iter(host_lineage))
+                lineage_areas_with_host = set(symbiont_lineage.areas_in_host_iter(host_lineage))
                 hosts_in_areas_added = 0
                 ## TODO: need to special case jump dispersal event subtype
                 # The following scheme assigns a symbiont to a new daughter
@@ -447,15 +447,15 @@ class InphestSimulator(object):
                 #             print("Host {:5}, {:10}: {}".format(host_lineage.rb_index, host_lineage.leafset_bitstring, sorted( "{:03}".format(a.area_idx) for a in host_lineage.current_area_iter() )))
                 #             print(" Ch0 {:5}, {:10}: {}".format(host_child0_lineage.rb_index, host_child0_lineage.leafset_bitstring, sorted( "{:03}".format(a.area_idx) for a in host_child0_lineage.current_area_iter() )))
                 #             print(" Ch1 {:5}, {:10}: {}".format(host_child1_lineage.rb_index, host_child1_lineage.leafset_bitstring, sorted( "{:03}".format(a.area_idx) for a in host_child1_lineage.current_area_iter() )))
-                #             print("Symb {}".format(sorted( "{:03}".format(a.area_idx) for a in symbiont_lineage.host_area_distribution.areas_in_host_iter(host_lineage) )))
+                #             print("Symb {}".format(sorted( "{:03}".format(a.area_idx) for a in symbiont_lineage.areas_in_host_iter(host_lineage) )))
 
                 for ch_lineage in (host_child0_lineage, host_child1_lineage):
                     for area in ch_lineage.current_area_iter():
                         if area in lineage_areas_with_host:
-                            symbiont_lineage.host_area_distribution.add_host_in_area(host_lineage=ch_lineage, area=area)
+                            symbiont_lineage.add_host_in_area(host_lineage=ch_lineage, area=area)
                             hosts_in_areas_added += 1
                 assert hosts_in_areas_added > 0
-                symbiont_lineage.host_area_distribution.remove_host(host_lineage)
+                symbiont_lineage.remove_host(host_lineage)
 
         if self.debug_mode:
             host_lineage.debug_check()
