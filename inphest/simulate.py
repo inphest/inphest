@@ -249,7 +249,7 @@ class InphestSimulator(object):
                         len(self.host_system.host_regime.events),
                         self.next_host_event))
                 event_f = self.process_host_event
-                event_args = (self.next_host_event,)
+                event_kwargs = {"host_event": self.next_host_event}
                 self.next_host_event = None
             else:
                 event_idx = model.weighted_index_choice(
@@ -259,7 +259,7 @@ class InphestSimulator(object):
                 if self.debug_mode:
                     self.run_logger.debug("Symbiont Event {}: {}".format(num_events, event_calls[event_idx]))
                 event_f = event_calls[event_idx][0]
-                event_args = event_calls[event_idx][1:]
+                event_kwargs = event_calls[event_idx][1]
 
             self.elapsed_time += time_till_event
             if self.model.max_time and self.elapsed_time > self.model.max_time:
@@ -273,7 +273,7 @@ class InphestSimulator(object):
                 lineage.edge.length += time_till_event
 
             ### EVENT EXECUTION
-            event_f(*event_args)
+            event_f(**event_kwargs)
 
             ### DEBUG
             if self.debug_mode:
@@ -311,14 +311,14 @@ class InphestSimulator(object):
             # Diversification Process: Birth (Speciation)
             speciation_rate = self.model.symbiont_lineage_birth_rate_function(lineage)
             if speciation_rate:
-                event_calls.append( (self.phylogeny.split_lineage, lineage) )
+                event_calls.append( (self.phylogeny.split_lineage, {"symbiont_lineage": lineage}) )
                 event_rates.append(speciation_rate)
 
             #---
             # Diversification Process: Death (Extinction)
             extinction_rate = self.model.symbiont_lineage_death_rate_function(lineage)
             if extinction_rate:
-                event_calls.append( (self.phylogeny.extinguish_lineage, lineage) )
+                event_calls.append( (self.phylogeny.extinguish_lineage, {"symbiont_lineage": lineage}) )
                 event_rates.append(extinction_rate)
 
             #---
@@ -347,14 +347,14 @@ class InphestSimulator(object):
                 for area in lineage.area_iter():
                     for src_host in infected_hosts[area]:
                         for dest_host in uninfected_hosts[area]:
-                            event_calls.append( (self.phylogeny.expand_lineage_host_set, (lineage, dest_host, area)) )
+                            event_calls.append( (self.phylogeny.expand_lineage_host_set, {"symbiont_lineage": lineage, "host_lineage": dest_host, "area": area,}) )
                             event_rates.append(per_area_host_infection_rate)
 
             #---
             # Anagenetic Host Set Evolution: Host Loss
             host_loss_rate = self.model.symbiont_lineage_host_loss_rate_function(lineage)
             if host_loss_rate:
-                event_calls.append( (self.phylogeny.contract_lineage_host_set, lineage) )
+                event_calls.append( (self.phylogeny.contract_lineage_host_set, {"symbiont_lineage": lineage}) )
                 event_rates.append(host_loss_rate)
 
             #---
@@ -377,14 +377,14 @@ class InphestSimulator(object):
                 for host_lineage in lineage.host_iter():
                     for src_area in occupied_areas[host_lineage]:
                         for dest_area in unoccupied_areas[host_lineage]:
-                            event_calls.append( (self.phylogeny.expand_lineage_area_set, (lineage, host_lineage, dest_area)) )
+                            event_calls.append( (self.phylogeny.expand_lineage_area_set, {"symbiont_lineage":lineage, "host_lineage":host_lineage, "area": dest_area,}) )
                             event_rates.append(per_host_area_gain_rate)
 
             #---
             # Anagenetic Area Set Evolution: Area Loss
             area_loss_rate = self.model.symbiont_lineage_area_loss_rate_function(lineage)
             if area_loss_rate:
-                event_calls.append( (self.phylogeny.contract_lineage_area_set, lineage) )
+                event_calls.append( (self.phylogeny.contract_lineage_area_set, {"symbiont_lineage": lineage} ))
                 event_rates.append(area_loss_rate)
 
         # sum_of_event_rates = sum(event_rates)

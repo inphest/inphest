@@ -774,7 +774,7 @@ class SymbiontPhylogeny(dendropy.Tree):
         for lineage in self.current_lineages:
             yield lineage
 
-    def split_lineage(self, lineage):
+    def split_lineage(self, symbiont_lineage):
         c1 = self.node_factory(
                 index=next(self.lineage_indexer),
                 host_system=self.host_system,
@@ -786,12 +786,12 @@ class SymbiontPhylogeny(dendropy.Tree):
         ### TODO: implement actual cladogenetic host/area inheritence logic
         ### Current: both daughters inherit parent host/area distribution
         for ch in (c1, c2):
-            ch.update_distribution(lineage)
+            ch.update_distribution(symbiont_lineage)
 
         # if self.debug_mode:
         #     self.run_logger.debug("Splitting {} with distribution {} under speciation mode {} to: {} (distribution: {}) and {} (distribution: {})".format(
-        #         lineage,
-        #         lineage.distribution_vector.presences(),
+        #         symbiont_lineage,
+        #         symbiont_lineage.distribution_vector.presences(),
         #         speciation_mode,
         #         c1,
         #         dist1.presences(),
@@ -801,30 +801,30 @@ class SymbiontPhylogeny(dendropy.Tree):
         #     assert len(dist1.presences()) > 0
         #     assert len(dist2.presences()) > 0
 
-        lineage.is_extant = False
-        self.current_lineages.remove(lineage)
-        lineage.clear_distribution()
-        lineage.add_child(c1)
-        lineage.add_child(c2)
+        symbiont_lineage.is_extant = False
+        self.current_lineages.remove(symbiont_lineage)
+        symbiont_lineage.clear_distribution()
+        symbiont_lineage.add_child(c1)
+        symbiont_lineage.add_child(c2)
         self.current_lineages.add(c1)
         self.current_lineages.add(c2)
 
-    def extinguish_lineage(self, lineage):
-        self._make_lineage_extinct_on_phylogeny(lineage)
+    def extinguish_lineage(self, symbiont_lineage):
+        self._make_lineage_extinct_on_phylogeny(symbiont_lineage)
 
-    def expand_lineage_host_set(self, lineage):
+    def expand_lineage_host_set(self, symbiont_lineage, host_lineage, area):
         pass
 
-    def contract_lineage_host_set(self, lineage):
+    def contract_lineage_host_set(self, symbiont_lineage, host_lineage, area):
         pass
 
-    def expand_lineage_area_set(self, lineage):
+    def expand_lineage_area_set(self, symbiont_lineage, host_lineage, area):
         pass
 
-    def contract_lineage_area_set(self, lineage):
+    def contract_lineage_area_set(self, symbiont_lineage, host_lineage, area):
         pass
 
-    def _make_lineage_extinct_on_phylogeny(self, lineage):
+    def _make_lineage_extinct_on_phylogeny(self, symbiont_lineage):
         if len(self.current_lineages) == 1:
             self.total_extinction_exception("no extant lineages remaining")
         lineage.is_extant = False
