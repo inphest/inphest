@@ -668,6 +668,18 @@ class SymbiontHostAreaDistribution(object):
         """
         return area in self._infected_areas
 
+    def clone(self, symbiont_lineage):
+        """
+        Returns deep-copy of this distribution.
+        """
+        d = self.__class__(
+                symbiont_lineage=symbiont_lineage,
+                host_system=self.host_system)
+        for host_lineage in self.host_system.host_lineages:
+            for area in self.host_system.areas:
+                d._host_area_distribution[host_lineage][area] = d._host_area_distribution[host_lineage][area]
+
+
     def debug_check(self, simulation_elapsed_time=None):
         # check that, as an extant lineage, it occupies at least
         # one host/area
@@ -711,12 +723,12 @@ class SymbiontHostAreaDistribution(object):
 
 class SymbiontLineage(dendropy.Node):
 
-    def __init__(self,
-            index,
-            host_area_distribution=None,
-            ):
+    def __init__(self, index, host_system):
         dendropy.Node.__init__(self)
-        self.host_area_distribution = host_area_distribution
+        self.host_system = host_system
+        self.host_area_distribution = SymbiontHostAreaDistribution(
+                symbiont_lineage=self,
+                host_system=self.host_system)
         self.host_area_distribution.lineage = self
         self.index = index
         self.is_extant = True
@@ -741,11 +753,14 @@ class SymbiontPhylogeny(dendropy.Tree):
             if "seed_node" not in kwargs:
                 seed_node = self.node_factory(
                         index=next(self.lineage_indexer),
-                        host_area_distribution=self.seed_symbiont_host_area_distribution(),
+                        host_system=self.host_system,
                         )
                 kwargs["seed_node"] = seed_node
             dendropy.Tree.__init__(self, *args, **kwargs)
             self.current_lineages = set([self.seed_node])
+            extant_host_lineages = self.host_system.extant_host_lineages_at_current_time(0)
+            for host_lineage in extant_host_lineages:
+                self.seed_node.host_area_distribution.add_host_in_area(host_lineage=host_lineage)
         else:
             dendropy.Tree.__init__(self, *args, **kwargs)
 
@@ -758,30 +773,40 @@ class SymbiontPhylogeny(dendropy.Tree):
         memo[id(self.taxon_namespace)] = self.taxon_namespace
         return dendropy.Tree.__deepcopy__(self, memo)
 
-    def new_symbiont_host_area_distribution(self, symbiont_lineage=None):
-        dm = SymbiontHostAreaDistribution(
-                symbiont_lineage=symbiont_lineage,
-                host_system=self.host_system)
-        return dm
-
-    def seed_symbiont_host_area_distribution(self, symbiont_lineage=None):
-        """
-        Creates suitable distribution for initial lineage.
-        """
-        # current logic, single lineage occupying all hosts and areas at the
-        # beginning of the simulation
-        dm = self.new_symbiont_host_area_distribution(symbiont_lineage=symbiont_lineage)
-        extant_host_lineages = self.host_system.extant_host_lineages_at_current_time(0)
-        for host_lineage in extant_host_lineages:
-            dm.add_host_in_area(host_lineage=host_lineage)
-        return dm
-
-    def iterate_current_lineages(self):
+    def current_lineage_iter(self):
         for lineage in self.current_lineages:
             yield lineage
 
     def split_lineage(self, lineage):
         pass
+        # c1 = self.node_factory(
+        #         index=next(self.lineage_indexer),
+        #         host_area_distribution=dist1,
+        #         )
+        # c2 = self.node_factory(
+        #         index=next(self.lineage_indexer),
+        #         host_area_distribution=dist2,
+        #         )
+
+        # if self.debug_mode:
+        #     self.run_logger.debug("Splitting {} with distribution {} under speciation mode {} to: {} (distribution: {}) and {} (distribution: {})".format(
+        #         lineage,
+        #         lineage.distribution_vector.presences(),
+        #         speciation_mode,
+        #         c1,
+        #         dist1.presences(),
+        #         c2,
+        #         dist2.presences(),
+        #         ))
+        #     assert len(dist1.presences()) > 0
+        #     assert len(dist2.presences()) > 0
+
+        # lineage.is_extant = False
+        # self.current_lineages.remove(lineage)
+        # lineage.add_child(c1)
+        # lineage.add_child(c2)
+        # self.current_lineages.add(c1)
+        # self.current_lineages.add(c2)
 
     def extinguish_lineage(self, lineage):
         self._make_lineage_extinct_on_phylogeny(lineage)
@@ -817,7 +842,7 @@ class SymbiontPhylogeny(dendropy.Tree):
 
     # def focal_area_lineages(self):
     #     focal_area_lineages = set()
-    #     for lineage in self.iterate_current_lineages():
+    #     for lineage in self.current_lineage_iter():
     #         for area_idx in self.model.geography.focal_area_indexes:
     #             if lineage.distribution_vector[area_idx] == 1:
     #                 focal_area_lineages.add(lineage)
@@ -826,7 +851,7 @@ class SymbiontPhylogeny(dendropy.Tree):
 
     # def num_focal_area_lineages(self):
     #     count = 0
-    #     for lineage in self.iterate_current_lineages():
+    #     for lineage in self.current_lineage_iter():
     #         for area_idx in self.model.geography.focal_area_indexes:
     #             if lineage.distribution_vector[area_idx] == 1:
     #                 count += 1

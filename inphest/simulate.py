@@ -269,7 +269,7 @@ class InphestSimulator(object):
                 self.run_logger.info("Termination condition of t = {} reached: storing results and terminating".format(self.elapsed_time))
                 self.store_sample(trees_file=self.trees_file)
                 break
-            for lineage in self.phylogeny.iterate_current_lineages():
+            for lineage in self.phylogeny.current_lineage_iter():
                 lineage.edge.length += time_till_event
 
             ### EVENT EXECUTION
@@ -305,7 +305,7 @@ class InphestSimulator(object):
         #     self.run_logger.debug("Scheduling events for {} current lineages".format(
         #         num_current_lineages))
 
-        for lineage in self.phylogeny.iterate_current_lineages():
+        for lineage in self.phylogeny.current_lineage_iter():
 
             #---
             # Diversification Process: Birth (Speciation)
@@ -404,7 +404,7 @@ class InphestSimulator(object):
                 self.host_system.check_lineage_distributions[host_lineage][host_event.area_idx] = "0"
                 self.run_logger.debug("Host lineage {}: anagenetic loss of area with index {}: {}".format(host_lineage.lineage_id, host_event.area_idx, self.host_system.check_lineage_distributions[host_lineage]))
             area = self.host_system.areas[host_event.area_idx]
-            for symbiont_lineage in self.phylogeny.iterate_current_lineages():
+            for symbiont_lineage in self.phylogeny.current_lineage_iter():
                 if symbiont_lineage.host_area_distribution.has_host_in_area(host_lineage, area):
                     try:
                         symbiont_lineage.host_area_distribution.remove_host_in_area(host_lineage, area)
@@ -429,7 +429,7 @@ class InphestSimulator(object):
                     assert ch_lineage.start_time <= self.elapsed_time
                     assert ch_lineage.end_time >= self.elapsed_time
                     self.host_system.debug_check_initial_distribution(ch_lineage)
-            for symbiont_lineage in self.phylogeny.iterate_current_lineages():
+            for symbiont_lineage in self.phylogeny.current_lineage_iter():
                 if not symbiont_lineage.host_area_distribution.has_host(host_lineage):
                     continue
                 lineage_areas_with_host = set(symbiont_lineage.host_area_distribution.areas_in_host_iter(host_lineage))
