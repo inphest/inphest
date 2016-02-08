@@ -676,7 +676,8 @@ class SymbiontLineage(dendropy.Node):
         for host_lineage in self._host_area_distribution:
             for area in self._host_area_distribution[host_lineage]:
                 self._host_area_distribution[host_lineage][area] = 0
-                area.symbiont_lineages.remove(self)
+        for area in self._infected_areas:
+            area.symbiont_lineages.remove(self)
         self._infected_hosts = set()
         self._infected_areas = set()
 

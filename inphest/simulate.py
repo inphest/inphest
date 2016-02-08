@@ -328,6 +328,7 @@ class InphestSimulator(object):
             ## "global infection rate", i.e., across all host/area.
             infected_hosts = {}
             uninfected_hosts = {}
+            num_potential_new_host_infection_events = 0
             for area in lineage.area_iter():
                 infected_hosts[area] = []
                 uninfected_hosts[area] = []
@@ -336,16 +337,18 @@ class InphestSimulator(object):
                         infected_hosts[area].append( host_lineage )
                     else:
                         uninfected_hosts[area].append( host_lineage )
-            # Here, if needed, we can adjust the rate to model a global infection rate
-            # rather than a per-event infection rate.
-            per_area_host_infection_rate = self.model.symbiont_lineage_host_gain_rate_function(lineage)
-            # If we stick to a per-event infection rate, this loop can, of course,
-            # be merged with the previous one.
-            for area in lineage.area_iter():
-                for src_host in infected_hosts[area]:
-                    for dest_host in uninfected_hosts[area]:
-                        event_calls.append( (self.phylogeny.expand_lineage_host_set, (lineage, dest_host, area)) )
-                        event_rates.append(per_area_host_infection_rate)
+                    num_potential_new_host_infection_events += ( len(uninfected_hosts[area]) * len(infected_hosts[area]) )
+            if num_potential_new_host_infection_events > 0:
+                # Here, if needed, we can adjust the rate to model a global infection rate
+                # rather than a per-event infection rate.
+                per_area_host_infection_rate = self.model.symbiont_lineage_host_gain_rate_function(lineage) / num_potential_new_host_infection_events
+                # If we stick to a per-event infection rate, this loop can, of course,
+                # be merged with the previous one.
+                for area in lineage.area_iter():
+                    for src_host in infected_hosts[area]:
+                        for dest_host in uninfected_hosts[area]:
+                            event_calls.append( (self.phylogeny.expand_lineage_host_set, (lineage, dest_host, area)) )
+                            event_rates.append(per_area_host_infection_rate)
 
             #---
             # Anagenetic Host Set Evolution: Host Loss
@@ -359,7 +362,7 @@ class InphestSimulator(object):
             # (same notes apply as for "Anagenetic Host Set Evolution, Host Gain")
             occupied_areas = {}
             unoccupied_areas = {}
-            per_host_area_gain_rate = self.model.symbiont_lineage_area_gain_rate_function(lineage)
+            num_potential_new_area_infection_events = 0
             for host_lineage in lineage.host_iter():
                 occupied_areas[host_lineage] = []
                 unoccupied_areas[host_lineage] = []
@@ -368,11 +371,14 @@ class InphestSimulator(object):
                         occupied_areas[host_lineage].append(area)
                     else:
                         unoccupied_areas[host_lineage].append(area)
-            for host_lineage in lineage.host_iter():
-                for src_area in occupied_areas[host_lineage]:
-                    for dest_area in unoccupied_areas[host_lineage]:
-                        event_calls.append( (self.phylogeny.expand_lineage_area_set, (lineage, host_lineage, dest_area)) )
-                        event_rates.append(per_host_area_gain_rate)
+                num_potential_new_area_infection_events += ( len(occupied_areas[host_lineage]) * len(unoccupied_areas[host_lineage]) )
+            if num_potential_new_area_infection_events > 0:
+                per_host_area_gain_rate = self.model.symbiont_lineage_area_gain_rate_function(lineage) / num_potential_new_area_infection_events
+                for host_lineage in lineage.host_iter():
+                    for src_area in occupied_areas[host_lineage]:
+                        for dest_area in unoccupied_areas[host_lineage]:
+                            event_calls.append( (self.phylogeny.expand_lineage_area_set, (lineage, host_lineage, dest_area)) )
+                            event_rates.append(per_host_area_gain_rate)
 
             #---
             # Anagenetic Area Set Evolution: Area Loss
