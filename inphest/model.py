@@ -761,13 +761,14 @@ class SymbiontPhylogeny(dendropy.Tree):
             self.seed_node.add_host_in_area(host_lineage=host_lineage)
 
     def __deepcopy__(self, memo=None):
-        if memo is None:
-            memo = {}
-        memo[id(self.model)] = self.model
-        memo[id(self.rng)] = None #self.rng
-        memo[id(self.run_logger)] = self.run_logger
-        memo[id(self.taxon_namespace)] = self.taxon_namespace
-        return dendropy.Tree.__deepcopy__(self, memo)
+        raise NotImplementedError
+        # if memo is None:
+        #     memo = {}
+        # memo[id(self.model)] = self.model
+        # memo[id(self.rng)] = None #self.rng
+        # memo[id(self.run_logger)] = self.run_logger
+        # memo[id(self.taxon_namespace)] = self.taxon_namespace
+        # return dendropy.Tree.__deepcopy__(self, memo)
 
     def current_lineage_iter(self):
         for lineage in self.current_lineages:
