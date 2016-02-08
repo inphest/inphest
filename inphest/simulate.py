@@ -347,7 +347,7 @@ class InphestSimulator(object):
                 for area in lineage.area_iter():
                     for src_host in infected_hosts[area]:
                         for dest_host in uninfected_hosts[area]:
-                            event_calls.append( (self.phylogeny.expand_lineage_host_set, {"symbiont_lineage": lineage, "host_lineage": dest_host, "area": area,}) )
+                            event_calls.append( (lineage.add_host_in_area,  {"host_lineage": dest_host, "area": area,}) )
                             event_rates.append(per_area_host_infection_rate)
 
             #---
@@ -462,6 +462,7 @@ class InphestSimulator(object):
                             hosts_in_areas_added += 1
                 assert hosts_in_areas_added > 0
                 symbiont_lineage.remove_host(host_lineage)
+            host_lineage.extinguish()
 
         if self.debug_mode:
             host_lineage.debug_check()

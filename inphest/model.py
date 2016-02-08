@@ -397,12 +397,46 @@ class HostLineage(object):
         for area in self._current_areas:
             yield area
 
+    def extinguish(self):
+        for area in self._current_areas:
+            area.host_lineages.remove(self)
+        self._current_areas = set()
+
     def debug_check(self):
         for area in self.host_system.areas:
             if area in self._current_areas:
                 assert self in area.host_lineages
             else:
                 assert self not in area.host_lineages
+
+    def debug_check_timing(self, simulation_elapsed_time, ignore_error=True):
+        try:
+            assert simulation_elapsed_time >= self.start_time
+        except AssertionError:
+            message = ("!! PREMATURELY ACTIVE HOST ERROR: {} ({}): times = {} to {}, current simulation elapsed time = {}".format(
+                self.lineage_id,
+                self.leafset_bitstring,
+                self.start_time,
+                self.end_time,
+                simulation_elapsed_time))
+            if not ignore_error:
+                raise AssertionError(message)
+            else:
+                print(message)
+        try:
+            assert simulation_elapsed_time < self.end_time
+        except AssertionError:
+            message = ("!!  EXTINCT HOST ERROR: {} ({}): times = {} to {}, current simulation elapsed time = {}".format(
+                    self.lineage_id,
+                    self.leafset_bitstring,
+                    self.start_time,
+                    self.end_time,
+                    simulation_elapsed_time))
+            if not ignore_error:
+                raise AssertionError(message)
+            else:
+                print(message)
+                raise
 
     # def area_iter(self):
     #     """
@@ -692,7 +726,7 @@ class SymbiontLineage(dendropy.Node):
         self._infected_hosts.update(other._infected_hosts)
         self._infected_areas.update(other._infected_areas)
 
-    def debug_check(self, simulation_elapsed_time=None):
+    def debug_check(self, simulation_elapsed_time=None, ignore_extinct_host_check_error=False):
         # check that, as an extant lineage, it occupies at least
         # one host/area
         infected_hosts = set()
@@ -721,17 +755,9 @@ class SymbiontLineage(dendropy.Node):
         # check that the infected hosts are supposed to exist at the current time
         if simulation_elapsed_time is not None:
             for host_lineage in self._infected_hosts:
-                try:
-                    assert simulation_elapsed_time >= host_lineage.start_time
-                    assert simulation_elapsed_time < host_lineage.end_time
-                except AssertionError:
-                    # until we finish properly processing host events ...
-                    print("!! IGNORING EXTINCT HOST CHECK ERROR: {} ({}): times = {} to {}, current simulation elapsed time = {}".format(
-                        host_lineage.lineage_id,
-                        host_lineage.leafset_bitstring,
-                        host_lineage.start_time,
-                        host_lineage.end_time,
-                        simulation_elapsed_time))
+                host_lineage.debug_check_timing(
+                        simulation_elapsed_time,
+                        ignore_error=ignore_extinct_host_check_error)
 
 class SymbiontPhylogeny(dendropy.Tree):
 
@@ -811,9 +837,6 @@ class SymbiontPhylogeny(dendropy.Tree):
 
     def extinguish_lineage(self, symbiont_lineage):
         self._make_lineage_extinct_on_phylogeny(symbiont_lineage)
-
-    def expand_lineage_host_set(self, symbiont_lineage, host_lineage, area):
-        pass
 
     def contract_lineage_host_set(self, symbiont_lineage, host_lineage, area):
         pass
