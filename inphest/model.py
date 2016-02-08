@@ -512,7 +512,7 @@ class HostSystem(object):
 
 class SymbiontLineage(dendropy.Node):
     """
-    Manages the host-by-area distribution of a single symbiont lineage.
+    A symbiont lineage.
     """
 
     class NullDistributionException(Exception):
@@ -669,17 +669,27 @@ class SymbiontLineage(dendropy.Node):
         """
         return area in self._infected_areas
 
-    def clone(self, symbiont_lineage):
+    def clear_distribution(self):
         """
-        Returns deep-copy of this distribution.
+        Clears out all host/area associations.
         """
-        d = self.__class__(
-                symbiont_lineage=symbiont_lineage,
-                host_system=self.host_system)
-        for host_lineage in self.host_system.host_lineages:
-            for area in self.host_system.areas:
-                d._host_area_distribution[host_lineage][area] = d._host_area_distribution[host_lineage][area]
+        for host_lineage in self._host_area_distribution:
+            for area in self._host_area_distribution[host_lineage]:
+                self._host_area_distribution[host_lineage][area] = 0
+                area.symbiont_lineages.remove(self)
+        self._infected_hosts = set()
+        self._infected_areas = set()
 
+    def update_distribution(self, other):
+        """
+        Adds all host/area associations in ``other`` to self.
+        """
+        for host_lineage in other._host_area_distribution:
+            for area in other._host_area_distribution[host_lineage]:
+                if other._host_area_distribution[host_lineage][area] == 1 and self._host_area_distribution[host_lineage][area] == 0:
+                    self.add_host_in_area(host_lineage=host_lineage, area=area)
+        self._infected_hosts.update(other._infected_hosts)
+        self._infected_areas.update(other._infected_areas)
 
     def debug_check(self, simulation_elapsed_time=None):
         # check that, as an extant lineage, it occupies at least
@@ -763,15 +773,18 @@ class SymbiontPhylogeny(dendropy.Tree):
             yield lineage
 
     def split_lineage(self, lineage):
-        pass
-        # c1 = self.node_factory(
-        #         index=next(self.lineage_indexer),
-        #         host_area_distribution=dist1,
-        #         )
-        # c2 = self.node_factory(
-        #         index=next(self.lineage_indexer),
-        #         host_area_distribution=dist2,
-        #         )
+        c1 = self.node_factory(
+                index=next(self.lineage_indexer),
+                host_system=self.host_system,
+                )
+        c2 = self.node_factory(
+                index=next(self.lineage_indexer),
+                host_system=self.host_system,
+                )
+        ### TODO: implement actual cladogenetic host/area inheritence logic
+        ### Current: both daughters inherit parent host/area distribution
+        for ch in (c1, c2):
+            ch.update_distribution(lineage)
 
         # if self.debug_mode:
         #     self.run_logger.debug("Splitting {} with distribution {} under speciation mode {} to: {} (distribution: {}) and {} (distribution: {})".format(
@@ -786,12 +799,13 @@ class SymbiontPhylogeny(dendropy.Tree):
         #     assert len(dist1.presences()) > 0
         #     assert len(dist2.presences()) > 0
 
-        # lineage.is_extant = False
-        # self.current_lineages.remove(lineage)
-        # lineage.add_child(c1)
-        # lineage.add_child(c2)
-        # self.current_lineages.add(c1)
-        # self.current_lineages.add(c2)
+        lineage.is_extant = False
+        self.current_lineages.remove(lineage)
+        lineage.clear_distribution()
+        lineage.add_child(c1)
+        lineage.add_child(c2)
+        self.current_lineages.add(c1)
+        self.current_lineages.add(c2)
 
     def extinguish_lineage(self, lineage):
         self._make_lineage_extinct_on_phylogeny(lineage)
