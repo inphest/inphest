@@ -370,9 +370,11 @@ class HostLineage(object):
         self.start_distribution_bitstring = host_regime_lineage_definition.lineage_start_distribution_bitstring
         self.end_distribution_bitstring = host_regime_lineage_definition.lineage_end_distribution_bitstring
         self._current_areas = set()
+        self.extancy = "pre"
         self.debug_mode = False
 
     def activate(self, simulation_elapsed_time=None, debug_mode=None):
+        assert self.extancy == "pre"
         if debug_mode is not None:
             self.debug_mode = debug_mode
         if simulation_elapsed_time is not None:
@@ -390,11 +392,14 @@ class HostLineage(object):
             self._current_distribution_check_bitlist = list(self.start_distribution_bitstring)
         else:
             self._current_distribution_check_bitlist = None
+        self.extancy = "current"
 
     def deactivate(self):
+        assert self.extancy == "current"
         for area in self._current_areas:
             area.host_lineages.remove(self)
         self._current_areas = set()
+        self.extancy = "post"
 
     def add_area(self, area):
         assert area not in self._current_areas
@@ -414,11 +419,10 @@ class HostLineage(object):
             yield area
 
     def debug_check(self, simulation_elapsed_time):
-        if simulation_elapsed_time is not None:
-            self.debug_check_timing(simulation_elapsed_time=simulation_elapsed_time)
+        self.debug_check_extancy_state(simulation_elapsed_time)
         self.debug_check_distribution(simulation_elapsed_time=simulation_elapsed_time)
 
-    def debug_check_timing(self, simulation_elapsed_time, ignore_error=False):
+    def assert_correctly_extant(self, simulation_elapsed_time, ignore_fail=False):
         try:
             assert simulation_elapsed_time >= self.start_time
         except AssertionError:
@@ -428,7 +432,7 @@ class HostLineage(object):
                 self.start_time,
                 self.end_time,
                 simulation_elapsed_time))
-            if not ignore_error:
+            if not ignore_fail:
                 raise AssertionError(message)
             else:
                 print(message)
@@ -441,19 +445,47 @@ class HostLineage(object):
                     self.start_time,
                     self.end_time,
                     simulation_elapsed_time))
-            if not ignore_error:
+            if not ignore_fail:
                 raise AssertionError(message)
             else:
                 print(message)
-                raise
+        try:
+            assert self.extancy == "current"
+        except AssertionError:
+            message = "!! HOST {}: expecting extancy to be 'current', but instead found: '{}'".format(self.lineage_id, self.extancy)
+            if not ignore_fail:
+                raise AssertionError(message)
+            else:
+                print(message)
 
-    def debug_check_distribution(self, simulation_elapsed_time=None):
-        if simulation_elapsed_time >= self.start_time and simulation_elapsed_time <= self.end_time:
+    def debug_check_extancy_state(self, simulation_elapsed_time):
+        message = ("Lineage {} ({}): times = {} to {}, current simulation elapsed time = {}: designated as '{}'".format(
+            self.lineage_id,
+            self.leafset_bitstring,
+            self.start_time,
+            self.end_time,
+            simulation_elapsed_time,
+            self.extancy))
+        if simulation_elapsed_time < self.start_time:
+            assert self.extancy == "pre", message
+        elif simulation_elapsed_time > self.end_time:
+            assert self.extancy == "post", message
+        elif simulation_elapsed_time == self.start_time:
+            assert self.extancy == "current" or self.extancy == "pre"
+        elif simulation_elapsed_time == self.end_time:
+            assert self.extancy == "current" or self.extancy == "post"
+        else:
+            assert self.extancy == "current"
+
+    def debug_check_distribution(self, simulation_elapsed_time):
+        if self.extancy == "current":
+            assert simulation_elapsed_time >= self.start_time
+            assert simulation_elapsed_time <= self.end_time
             if self.debug_mode:
                 for area_idx, presence in enumerate(self._current_distribution_check_bitlist):
                     area = self.host_system.areas[area_idx]
                     if presence == "1":
-                        assert self.host_system.areas[area_idx] in self._current_areas
+                        assert self.host_system.areas[area_idx] in self._current_areas, "{}".format(self.lineage_id)
                         assert self in area.host_lineages
                     elif presence == "0":
                         assert self.host_system.areas[area_idx] not in self._current_areas
@@ -467,6 +499,14 @@ class HostLineage(object):
                     else:
                         assert self not in area.host_lineages
         else:
+            if self.extancy == "pre":
+                assert simulation_elapsed_time <= self.start_time
+                assert simulation_elapsed_time <= self.end_time
+            elif self.extancy == "post":
+                assert simulation_elapsed_time >= self.start_time
+                assert simulation_elapsed_time >= self.end_time
+            else:
+                raise ValueError(self.extancy)
             for area in self.host_system.areas:
                 assert self not in area.host_lineages
 
@@ -757,7 +797,7 @@ class SymbiontLineage(dendropy.Node):
         self._infected_hosts.update(other._infected_hosts)
         self._infected_areas.update(other._infected_areas)
 
-    def debug_check(self, simulation_elapsed_time=None, ignore_extinct_host_check_error=False):
+    def debug_check(self, simulation_elapsed_time=None, ignore_nonextant_host_check_fail=False):
         # check that, as an extant lineage, it occupies at least
         # one host/area
         infected_hosts = set()
@@ -786,9 +826,9 @@ class SymbiontLineage(dendropy.Node):
         # check that the infected hosts are supposed to exist at the current time
         if simulation_elapsed_time is not None:
             for host_lineage in self._infected_hosts:
-                host_lineage.debug_check_timing(
+                host_lineage.assert_correctly_extant(
                         simulation_elapsed_time,
-                        ignore_error=ignore_extinct_host_check_error)
+                        ignore_fail=ignore_nonextant_host_check_fail)
 
 class SymbiontPhylogeny(dendropy.Tree):
 

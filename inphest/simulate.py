@@ -174,6 +174,7 @@ class InphestSimulator(object):
     def deactivate_host_lineage(self, host_lineage):
         assert host_lineage in self.activated_host_lineages
         assert host_lineage not in self.deactivated_host_lineages
+        host_lineage.deactivate()
         self.activated_host_lineages.remove(host_lineage)
         self.deactivated_host_lineages.add(host_lineage)
 
@@ -354,7 +355,7 @@ class InphestSimulator(object):
                 uninfected_hosts[area] = []
                 for host_lineage in area.host_lineages:
                     if self.debug_mode:
-                        host_lineage.debug_check_timing(simulation_elapsed_time=self.elapsed_time)
+                        host_lineage.assert_correctly_extant(simulation_elapsed_time=self.elapsed_time)
                     if lineage.has_host(host_lineage):
                         infected_hosts[area].append( host_lineage )
                     else:
