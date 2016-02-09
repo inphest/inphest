@@ -206,7 +206,7 @@ class InphestSimulator(object):
         if self.log_frequency:
             last_logged_time = 0.0
 
-        ### check system
+        ### check system setup
         if self.debug_mode:
             self.host_system.debug_check(simulation_elapsed_time=None)
 
@@ -293,7 +293,10 @@ class InphestSimulator(object):
                 lineage.edge.length += time_till_event
 
             ### EVENT EXECUTION
-            event_f(**event_kwargs)
+            try:
+                event_f(**event_kwargs)
+            except model.SymbiontLineage.NullDistributionException as lineage_null_distribution_exception:
+                self.phylogeny.extinction_rate(symbiont_lineage=lineage_null_distribution_exception.lineage)
 
             ### DEBUG
             if self.debug_mode:
@@ -376,8 +379,9 @@ class InphestSimulator(object):
             # Anagenetic Host Set Evolution: Host Loss
             host_loss_rate = self.model.symbiont_lineage_host_loss_rate_function(lineage)
             if host_loss_rate:
-                event_calls.append( (self.phylogeny.contract_lineage_host_set, {"symbiont_lineage": lineage}) )
-                event_rates.append(host_loss_rate)
+                for host_lineage in lineage.host_iter():
+                    event_calls.append( (lineage.remove_host, {"host_lineage": host_lineage}) )
+                    event_rates.append(host_loss_rate)
 
             #---
             # Anagenetic Area Set Evolution: Area Gain
@@ -399,15 +403,17 @@ class InphestSimulator(object):
                 for host_lineage in lineage.host_iter():
                     for src_area in occupied_areas[host_lineage]:
                         for dest_area in unoccupied_areas[host_lineage]:
-                            event_calls.append( (self.phylogeny.expand_lineage_area_set, {"symbiont_lineage":lineage, "host_lineage":host_lineage, "area": dest_area,}) )
+                            event_calls.append( (lineage.add_host_in_area, {"host_lineage":host_lineage, "area": dest_area,}) )
                             event_rates.append(per_host_area_gain_rate)
 
             #---
             # Anagenetic Area Set Evolution: Area Loss
             area_loss_rate = self.model.symbiont_lineage_area_loss_rate_function(lineage)
             if area_loss_rate:
-                event_calls.append( (self.phylogeny.contract_lineage_area_set, {"symbiont_lineage": lineage} ))
-                event_rates.append(area_loss_rate)
+                for host_lineage in lineage.host_iter():
+                    for area in lineage.areas_in_host_iter():
+                        event_calls.append( (lineage.remove_host_in_area, {"host_lineage": lineage, "area": area} ))
+                        event_rates.append(area_loss_rate)
 
         # sum_of_event_rates = sum(event_rates)
         return event_calls, event_rates

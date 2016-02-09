@@ -624,7 +624,8 @@ class SymbiontLineage(dendropy.Node):
     """
 
     class NullDistributionException(Exception):
-        pass
+        def __init__(lineage):
+            self.lineage = lineage
 
     def __init__(self, index, host_system):
 
@@ -669,6 +670,7 @@ class SymbiontLineage(dendropy.Node):
             assert host_lineage.has_area(area)
             self._host_area_distribution[host_lineage][area] = 1
             area.symbiont_lineages.add(self)
+            self._infected_areas.add(area)
         self._infected_hosts.add(host_lineage)
 
     def remove_host_in_area(self, host_lineage, area=None):
@@ -742,7 +744,7 @@ class SymbiontLineage(dendropy.Node):
         Ensures that lineage occurs at least in one host in one area.
         """
         if not self._infected_hosts or not self._infected_areas:
-            raise SymbiontLineage.NullDistributionException()
+            raise SymbiontLineage.NullDistributionException(lineage=self)
 
     def has_host(self, host_lineage):
         """
@@ -832,7 +834,7 @@ class SymbiontLineage(dendropy.Node):
         assert occurrences > 0
         # check that the caches are in sync
         assert infected_hosts == self._infected_hosts
-        assert infected_areas == self._infected_areas
+        assert infected_areas == self._infected_areas, "{} != {}".format([a.area_idx for a in infected_areas], [a.area_idx for a in self._infected_areas])
         for area in noninfected_areas:
             assert self not in area.symbiont_lineages
         # check that the infected hosts are supposed to exist at the current time
@@ -918,14 +920,14 @@ class SymbiontPhylogeny(dendropy.Tree):
     def extinguish_lineage(self, symbiont_lineage):
         self._make_lineage_extinct_on_phylogeny(symbiont_lineage)
 
-    def contract_lineage_host_set(self, symbiont_lineage, host_lineage, area):
-        pass
+    # def contract_lineage_host_set(self, symbiont_lineage, host_lineage, area):
+    #     pass
 
-    def expand_lineage_area_set(self, symbiont_lineage, host_lineage, area):
-        pass
+    # def expand_lineage_area_set(self, symbiont_lineage, host_lineage, area):
+    #     pass
 
-    def contract_lineage_area_set(self, symbiont_lineage, host_lineage, area):
-        pass
+    # def contract_lineage_area_set(self, symbiont_lineage, host_lineage, area):
+    #     pass
 
     def _make_lineage_extinct_on_phylogeny(self, symbiont_lineage):
         if len(self.current_lineages) == 1:
