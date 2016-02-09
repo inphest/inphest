@@ -448,14 +448,15 @@ class HostLineage(object):
                 raise
 
     def debug_check_distribution(self, simulation_elapsed_time=None):
-        if simulation_elapsed_time >= self.start_time and simulation_elapsed_time < self.end_time:
+        if simulation_elapsed_time >= self.start_time and simulation_elapsed_time <= self.end_time:
             if self.debug_mode:
                 for area_idx, presence in enumerate(self._current_distribution_check_bitlist):
+                    area = self.host_system.areas[area_idx]
                     if presence == "1":
-                        assert self.host_system.areas[area_idx] in host_lineage._current_areas
+                        assert self.host_system.areas[area_idx] in self._current_areas
                         assert self in area.host_lineages
                     elif presence == "0":
-                        assert self.host_system.areas[area_idx] not in host_lineage._current_areas
+                        assert self.host_system.areas[area_idx] not in self._current_areas
                         assert self not in area.host_lineages
                     else:
                         raise ValueError

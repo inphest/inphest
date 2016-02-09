@@ -421,16 +421,16 @@ class InphestSimulator(object):
             host_lineage.debug_check(simulation_elapsed_time=self.elapsed_time)
         if host_event.event_type == "anagenesis" and host_event.event_subtype == "area_gain":
             if self.debug_mode:
-                assert self.host_system.check_lineage_distributions[host_lineage][host_event.area_idx] == "0"
-                self.host_system.check_lineage_distributions[host_lineage][host_event.area_idx] = "1"
-                self.run_logger.debug("Host lineage {}: anagenetic gain of area with index {}: {}".format(host_lineage.lineage_id, host_event.area_idx, self.host_system.check_lineage_distributions[host_lineage]))
+                assert host_lineage._current_distribution_check_bitlist[host_event.area_idx] == "0"
+                host_lineage._current_distribution_check_bitlist[host_event.area_idx] = "1"
+                self.run_logger.debug("Host lineage {}: anagenetic gain of area with index {}: {}".format(host_lineage.lineage_id, host_event.area_idx, host_lineage._current_distribution_check_bitlist))
             area = self.host_system.areas[host_event.area_idx]
             host_lineage.add_area(area)
         elif host_event.event_type == "anagenesis" and host_event.event_subtype == "area_loss":
             if self.debug_mode:
-                assert self.host_system.check_lineage_distributions[host_lineage][host_event.area_idx] == "1"
-                self.host_system.check_lineage_distributions[host_lineage][host_event.area_idx] = "0"
-                self.run_logger.debug("Host lineage {}: anagenetic loss of area with index {}: {}".format(host_lineage.lineage_id, host_event.area_idx, self.host_system.check_lineage_distributions[host_lineage]))
+                assert host_lineage._current_distribution_check_bitlist[host_event.area_idx] == "1"
+                host_lineage._current_distribution_check_bitlist[host_event.area_idx] = "0"
+                self.run_logger.debug("Host lineage {}: anagenetic loss of area with index {}: {}".format(host_lineage.lineage_id, host_event.area_idx, host_lineage._current_distribution_check_bitlist))
             area = self.host_system.areas[host_event.area_idx]
             for symbiont_lineage in self.phylogeny.current_lineage_iter():
                 if symbiont_lineage.has_host_in_area(host_lineage, area):
@@ -449,16 +449,16 @@ class InphestSimulator(object):
                 assert host_child1_lineage.lineage_id == host_event.child1_lineage_id
                 self.run_logger.debug("Host lineage {} ({}): splitting into lineages {} ({}) and {} ({})".format(
                     host_lineage.lineage_id,
-                    self.host_system.check_lineage_distributions[host_lineage],
+                    host_lineage._current_distribution_check_bitlist,
                     host_event.child0_lineage_id,
-                    self.host_system.check_lineage_distributions[host_child0_lineage],
+                    host_child0_lineage._current_distribution_check_bitlist,
                     host_event.child1_lineage_id,
-                    self.host_system.check_lineage_distributions[host_child1_lineage],
+                    host_child1_lineage._current_distribution_check_bitlist,
                     ))
                 for ch_lineage in (host_child0_lineage, host_child1_lineage):
-                    assert ch_lineage.start_time <= self.elapsed_time
-                    assert ch_lineage.end_time >= self.elapsed_time
-                    self.host_system.debug_check_initial_distribution(ch_lineage)
+                    # assert ch_lineage.start_time <= self.elapsed_time
+                    # assert ch_lineage.end_time >= self.elapsed_time
+                    ch_lineage.debug_check(simulation_elapsed_time=self.elapsed_time)
             for symbiont_lineage in self.phylogeny.current_lineage_iter():
                 if not symbiont_lineage.has_host(host_lineage):
                     continue
