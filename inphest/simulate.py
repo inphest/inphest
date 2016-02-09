@@ -60,15 +60,13 @@ class InphestSimulator(object):
         self.model = inphest_model
 
         # initialize host system
-        self.host_system = model.HostSystem(
-                host_regime=self.model.host_regime,
-                debug_mode=self.debug_mode,
-                run_logger=self.run_logger,
-                )
+        self.host_system = model.HostSystem(host_regime=self.model.host_regime, run_logger=self.run_logger,)
 
         # track host events
         self.next_host_event = None
         self.processed_host_events = set()
+        self.activated_host_lineages = set()
+        self.deactivated_host_lineages = set()
 
         # initialize phylogeny
         self.phylogeny = model.SymbiontPhylogeny(
@@ -164,6 +162,21 @@ class InphestSimulator(object):
         if config_d:
             raise TypeError("Unsupported configuration keywords: {}".format(config_d))
 
+    def activate_host_lineage(self, host_lineage):
+        # if host_lineage.lineage_id == 8191:
+        #     assert False
+        #     print("\n\n\n\n\n\nactivating!\n\n\n\n\n")
+        assert host_lineage not in self.activated_host_lineages, "Host lineage {} already activated".format(host_lineage.lineage_id)
+        assert host_lineage not in self.deactivated_host_lineages
+        host_lineage.activate(simulation_elapsed_time=self.elapsed_time, debug_mode=self.debug_mode)
+        self.activated_host_lineages.add(host_lineage)
+
+    def deactivate_host_lineage(self, host_lineage):
+        assert host_lineage in self.activated_host_lineages
+        assert host_lineage not in self.deactivated_host_lineages
+        self.activated_host_lineages.remove(host_lineage)
+        self.deactivated_host_lineages.add(host_lineage)
+
     def run(self):
 
         ### Save model
@@ -194,11 +207,18 @@ class InphestSimulator(object):
 
         ### check system
         if self.debug_mode:
-            self.host_system.debug_check()
+            self.host_system.debug_check(simulation_elapsed_time=None)
 
         ### Initialize run debugging
         if self.debug_mode:
             num_events = 0
+
+        ### Initialize seed node distribution
+        extant_host_lineages = self.host_system.extant_host_lineages_at_current_time(0)
+        seed_host_lineage = self.host_system.seed_host_lineage()
+        self.activate_host_lineage(seed_host_lineage)
+        for lineage in self.phylogeny.current_lineages:
+            lineage.add_host_in_area(host_lineage=seed_host_lineage)
 
         ### Initialize termination conditiong checking
         # ntips_in_focal_areas = self.phylogeny.num_focal_area_lineages()
@@ -333,6 +353,8 @@ class InphestSimulator(object):
                 infected_hosts[area] = []
                 uninfected_hosts[area] = []
                 for host_lineage in area.host_lineages:
+                    if self.debug_mode:
+                        host_lineage.debug_check_timing(simulation_elapsed_time=self.elapsed_time)
                     if lineage.has_host(host_lineage):
                         infected_hosts[area].append( host_lineage )
                     else:
@@ -396,7 +418,7 @@ class InphestSimulator(object):
         assert host_lineage.start_time <= self.elapsed_time
         assert host_lineage.end_time >= self.elapsed_time
         if self.debug_mode:
-            host_lineage.debug_check()
+            host_lineage.debug_check(simulation_elapsed_time=self.elapsed_time)
         if host_event.event_type == "anagenesis" and host_event.event_subtype == "area_gain":
             if self.debug_mode:
                 assert self.host_system.check_lineage_distributions[host_lineage][host_event.area_idx] == "0"
@@ -419,7 +441,9 @@ class InphestSimulator(object):
             host_lineage.remove_area(area)
         elif host_event.event_type == "cladogenesis":
             host_child0_lineage = self.host_system.host_lineages_by_id[host_event.child0_lineage_id]
+            self.activate_host_lineage(host_child0_lineage)
             host_child1_lineage = self.host_system.host_lineages_by_id[host_event.child1_lineage_id]
+            self.activate_host_lineage(host_child1_lineage)
             if self.debug_mode:
                 assert host_child0_lineage.lineage_id == host_event.child0_lineage_id
                 assert host_child1_lineage.lineage_id == host_event.child1_lineage_id
@@ -462,10 +486,10 @@ class InphestSimulator(object):
                             hosts_in_areas_added += 1
                 assert hosts_in_areas_added > 0
                 symbiont_lineage.remove_host(host_lineage)
-            host_lineage.extinguish()
+            self.deactivate_host_lineage(host_lineage)
 
         if self.debug_mode:
-            host_lineage.debug_check()
+            host_lineage.debug_check(simulation_elapsed_time=self.elapsed_time)
 
         self.processed_host_events.add(host_event)
 

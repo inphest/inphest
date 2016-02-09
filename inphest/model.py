@@ -369,8 +369,15 @@ class HostLineage(object):
         self.end_time = host_regime_lineage_definition.lineage_end_time
         self.start_distribution_bitstring = host_regime_lineage_definition.lineage_start_distribution_bitstring
         self.end_distribution_bitstring = host_regime_lineage_definition.lineage_end_distribution_bitstring
-        self.current_distribution_bitstring = host_regime_lineage_definition.lineage_end_distribution_bitstring
         self._current_areas = set()
+        self.debug_mode = False
+
+    def activate(self, simulation_elapsed_time=None, debug_mode=None):
+        if debug_mode is not None:
+            self.debug_mode = debug_mode
+        if simulation_elapsed_time is not None:
+            assert simulation_elapsed_time >= self.start_time
+            assert simulation_elapsed_time <= self.end_time
         assert len(self.host_system.areas) == len(self.start_distribution_bitstring)
         for (area_idx, area), (d_idx, presence) in zip(enumerate(self.host_system.areas), enumerate(self.start_distribution_bitstring)):
             assert area_idx == d_idx
@@ -379,6 +386,15 @@ class HostLineage(object):
                 self.add_area(area)
             else:
                 assert presence == "0"
+        if self.debug_mode:
+            self._current_distribution_check_bitlist = list(self.start_distribution_bitstring)
+        else:
+            self._current_distribution_check_bitlist = None
+
+    def deactivate(self):
+        for area in self._current_areas:
+            area.host_lineages.remove(self)
+        self._current_areas = set()
 
     def add_area(self, area):
         assert area not in self._current_areas
@@ -397,19 +413,12 @@ class HostLineage(object):
         for area in self._current_areas:
             yield area
 
-    def extinguish(self):
-        for area in self._current_areas:
-            area.host_lineages.remove(self)
-        self._current_areas = set()
+    def debug_check(self, simulation_elapsed_time):
+        if simulation_elapsed_time is not None:
+            self.debug_check_timing(simulation_elapsed_time=simulation_elapsed_time)
+        self.debug_check_distribution(simulation_elapsed_time=simulation_elapsed_time)
 
-    def debug_check(self):
-        for area in self.host_system.areas:
-            if area in self._current_areas:
-                assert self in area.host_lineages
-            else:
-                assert self not in area.host_lineages
-
-    def debug_check_timing(self, simulation_elapsed_time, ignore_error=True):
+    def debug_check_timing(self, simulation_elapsed_time, ignore_error=False):
         try:
             assert simulation_elapsed_time >= self.start_time
         except AssertionError:
@@ -424,7 +433,7 @@ class HostLineage(object):
             else:
                 print(message)
         try:
-            assert simulation_elapsed_time < self.end_time
+            assert simulation_elapsed_time <= self.end_time
         except AssertionError:
             message = ("!!  EXTINCT HOST ERROR: {} ({}): times = {} to {}, current simulation elapsed time = {}".format(
                     self.lineage_id,
@@ -437,6 +446,28 @@ class HostLineage(object):
             else:
                 print(message)
                 raise
+
+    def debug_check_distribution(self, simulation_elapsed_time=None):
+        if simulation_elapsed_time >= self.start_time and simulation_elapsed_time < self.end_time:
+            if self.debug_mode:
+                for area_idx, presence in enumerate(self._current_distribution_check_bitlist):
+                    if presence == "1":
+                        assert self.host_system.areas[area_idx] in host_lineage._current_areas
+                        assert self in area.host_lineages
+                    elif presence == "0":
+                        assert self.host_system.areas[area_idx] not in host_lineage._current_areas
+                        assert self not in area.host_lineages
+                    else:
+                        raise ValueError
+            else:
+                for area in self.host_system.areas:
+                    if area in self._current_areas:
+                        assert self in area.host_lineages
+                    else:
+                        assert self not in area.host_lineages
+        else:
+            for area in self.host_system.areas:
+                assert self not in area.host_lineages
 
     # def area_iter(self):
     #     """
@@ -465,16 +496,14 @@ class HostSystem(object):
 
     def __init__(self,
             host_regime,
-            debug_mode=False,
             run_logger=None):
-        self.debug_mode = debug_mode
-        self.compile(host_regime, debug_mode=debug_mode)
-        if self.debug_mode:
-            ## setup for checking initial distributions ##
-            self.check_lineage_distributions = {}
-            for host_lineage in self.host_lineages:
-                self.check_lineage_distributions[host_lineage] = list(host_lineage.start_distribution_bitstring)
-                self.debug_check_initial_distribution(host_lineage)
+        self.compile(host_regime)
+        # if self.debug_mode:
+        #     ## setup for checking initial distributions ##
+        #     self.check_lineage_distributions = {}
+        #     for host_lineage in self.host_lineages:
+        #         self.check_lineage_distributions[host_lineage] = list(host_lineage.start_distribution_bitstring)
+        #         self.debug_check_initial_distribution(host_lineage)
         self._next_host_event = None
 
     def compile(self, host_regime, debug_mode=False):
@@ -519,14 +548,24 @@ class HostSystem(object):
     def extant_host_lineages_at_current_time(self, current_time):
         ## TODO: if we hit this often, we need to construct a look-up table
         lineages = set()
-        for host in self.host_lineages_by_id.values():
-            if host.start_time <= current_time and host.end_time > current_time:
-                lineages.add(host)
+        for host_lineage in self.host_lineages_by_id.values():
+            if host_lineage.start_time <= current_time and host_lineage.end_time >= current_time:
+                lineages.add(host_lineage)
         return lineages
 
-    def debug_check(self):
+    def seed_host_lineage(self):
+        selected_host_lineage = None
+        for host_lineage in self.host_lineages_by_id.values():
+            if selected_host_lineage is None:
+                selected_host_lineage = host_lineage
+            else:
+                if host_lineage.start_time <= selected_host_lineage.start_time:
+                    selected_host_lineage = host_lineage
+        return selected_host_lineage
+
+    def debug_check(self, simulation_elapsed_time=None):
         for host_lineage in self.host_lineages:
-            host_lineage.debug_check()
+            host_lineage.debug_check(simulation_elapsed_time=simulation_elapsed_time)
             for area in host_lineage._current_areas:
                 assert area in self.areas
         for event in self.host_events:
@@ -534,15 +573,6 @@ class HostSystem(object):
             if area_idx is None:
                 continue
             assert self.areas[area_idx].area_idx == area_idx
-
-    def debug_check_initial_distribution(self, host_lineage):
-        for area_idx, presence in enumerate(self.check_lineage_distributions[host_lineage]):
-            if presence == "1":
-                assert self.areas[area_idx] in host_lineage._current_areas
-            elif presence == "0":
-                assert self.areas[area_idx] not in host_lineage._current_areas
-            else:
-                raise ValueError
 
 class SymbiontLineage(dendropy.Node):
     """
@@ -782,9 +812,6 @@ class SymbiontPhylogeny(dendropy.Tree):
             kwargs["seed_node"] = seed_node
         dendropy.Tree.__init__(self, *args, **kwargs)
         self.current_lineages = set([self.seed_node])
-        extant_host_lineages = self.host_system.extant_host_lineages_at_current_time(0)
-        for host_lineage in extant_host_lineages:
-            self.seed_node.add_host_in_area(host_lineage=host_lineage)
 
     def __deepcopy__(self, memo=None):
         raise NotImplementedError
