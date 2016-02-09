@@ -191,6 +191,8 @@ class HostRegime(object):
         "lineage_end_time",            # time lineage ends
         "lineage_start_distribution_bitstring",  #   distribution/range (area set) at beginning of lineage
         "lineage_end_distribution_bitstring",    #   distribution/range (area set) at end of lineage
+        "is_seed_node",
+        "is_leaf",
     ])
 
     HostEvent = collections.namedtuple("HostEvent", [
@@ -294,6 +296,8 @@ class HostRegimeSamples(object):
                     lineage_end_time=edge_entry["edge_end_time"],
                     lineage_start_distribution_bitstring=edge_entry["edge_starting_state"],
                     lineage_end_distribution_bitstring=edge_entry["edge_ending_state"],
+                    is_seed_node=edge_entry["is_seed_node"],
+                    is_leaf=edge_entry["is_leaf"],
                     )
             assert lineage.lineage_id not in tree_host_regimes[tree_idx].lineages
             assert lineage.lineage_start_time <= lineage.lineage_end_time, "{}, {}".format(lineage.lineage_start_time, lineage.lineage_end_time)
@@ -369,6 +373,8 @@ class HostLineage(object):
         self.end_time = host_regime_lineage_definition.lineage_end_time
         self.start_distribution_bitstring = host_regime_lineage_definition.lineage_start_distribution_bitstring
         self.end_distribution_bitstring = host_regime_lineage_definition.lineage_end_distribution_bitstring
+        self.is_seed_node = host_regime_lineage_definition.is_seed_node
+        self.is_leaf = host_regime_lineage_definition.is_leaf
         self._current_areas = set()
         self.extancy = "pre"
         self.debug_mode = False
@@ -574,6 +580,8 @@ class HostSystem(object):
         # compile lineages
         self.host_lineages = set()
         self.host_lineages_by_id = {}
+        self.leaf_host_lineages = set()
+        self.seed_host_lineage = None
         for host_regime_lineage_id_definition in self.host_regime.lineages.values():
             host = HostLineage(
                     host_regime_lineage_definition=host_regime_lineage_id_definition,
@@ -582,27 +590,22 @@ class HostSystem(object):
                     )
             self.host_lineages.add(host)
             self.host_lineages_by_id[host.lineage_id] = host
+            if host.is_seed_node:
+                assert self.seed_host_lineage is None
+                self.seed_host_lineage = host
+            if host.is_leaf:
+                self.leaf_host_lineages.add(host)
 
         # local copy of host events
         self.host_events = list(self.host_regime.events)
 
     def extant_host_lineages_at_current_time(self, current_time):
         ## TODO: if we hit this often, we need to construct a look-up table
-        lineages = set()
+        lineages = []
         for host_lineage in self.host_lineages_by_id.values():
             if host_lineage.start_time <= current_time and host_lineage.end_time >= current_time:
-                lineages.add(host_lineage)
+                lineages.append(host_lineage)
         return lineages
-
-    def seed_host_lineage(self):
-        selected_host_lineage = None
-        for host_lineage in self.host_lineages_by_id.values():
-            if selected_host_lineage is None:
-                selected_host_lineage = host_lineage
-            else:
-                if host_lineage.start_time <= selected_host_lineage.start_time:
-                    selected_host_lineage = host_lineage
-        return selected_host_lineage
 
     def debug_check(self, simulation_elapsed_time=None):
         for host_lineage in self.host_lineages:

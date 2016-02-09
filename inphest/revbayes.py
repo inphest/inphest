@@ -113,9 +113,11 @@ class RevBayesBiogeographyParser(object):
                 if nd.parent_node:
                     nd.time = nd.parent_node.time + nd.edge.length
                     edge_entry["edge_start_time"] = nd.parent_node.time
+                    edge_entry["is_seed_node"] = False
                 else:
                     nd.time = 0.0
                     edge_entry["edge_start_time"] = -1.0
+                    edge_entry["is_seed_node"] = True
                 edge_entry["edge_duration"] = nd.edge.length
                 edge_entry["edge_end_time"] = nd.time
                 # edge_entry["edge_duration"] = nd.edge.length
@@ -129,7 +131,9 @@ class RevBayesBiogeographyParser(object):
                 if nd.is_leaf():
                     edge_entry["child0_edge_id"] = RevBayesBiogeographyParser.NULL_VALUE
                     edge_entry["child1_edge_id"] = RevBayesBiogeographyParser.NULL_VALUE
+                    edge_entry["is_leaf"] = True
                 else:
+                    edge_entry["is_leaf"] = False
                     for ch_idx, ch in enumerate(nd.child_node_iter()):
                         edge_entry["child{}_edge_id".format(ch_idx)] = int(ch.edge.bipartition)
                 edge_metadata, edge_events = self._extract_comment_metadata(nd)

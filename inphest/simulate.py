@@ -216,10 +216,9 @@ class InphestSimulator(object):
 
         ### Initialize seed node distribution
         extant_host_lineages = self.host_system.extant_host_lineages_at_current_time(0)
-        seed_host_lineage = self.host_system.seed_host_lineage()
-        self.activate_host_lineage(seed_host_lineage)
+        self.activate_host_lineage(self.host_system.seed_host_lineage)
         for lineage in self.phylogeny.current_lineages:
-            lineage.add_host_in_area(host_lineage=seed_host_lineage)
+            lineage.add_host_in_area(host_lineage=self.host_system.seed_host_lineage)
 
         ### Initialize termination conditiong checking
         # ntips_in_focal_areas = self.phylogeny.num_focal_area_lineages()
@@ -502,9 +501,25 @@ class InphestSimulator(object):
 
     def write_tree(self, out, tree):
         if self.is_encode_nodes:
-            labelf = lambda x: self.model.encode_lineage(x,
-                    set_label=False,
-                    add_annotation=self.is_annotate_nodes)
+            # host_lineages = self.host_system.extant_host_lineages_at_current_time(self.elapsed_time)
+            # host_lineages = self.host_system.leaf_host_lineages
+            host_lineages = self.host_system.host_lineages
+            lineage_labels = {}
+            for symbiont_lineage in tree:
+                current_hosts = []
+                for idx, host_lineage in enumerate(host_lineages):
+                    if symbiont_lineage.has_host(host_lineage):
+                        current_hosts.append("1")
+                    else:
+                        current_hosts.append("0")
+                current_hosts_bitstring = "".join(current_hosts)
+                label = "s{lineage_index}{sep}{host_occurrences}".format(
+                        lineage_index=symbiont_lineage.index,
+                        sep=model.InphestModel._LABEL_COMPONENTS_SEPARATOR,
+                        host_occurrences=current_hosts_bitstring,
+                        )
+                lineage_labels[symbiont_lineage] = label
+            labelf = lambda x: lineage_labels[x]
         else:
             labelf = InphestSimulator.simple_node_label_function
         tree.write_to_stream(
@@ -514,18 +529,6 @@ class InphestSimulator(object):
                 node_label_compose_fn=labelf,
                 suppress_internal_node_labels=self.is_suppress_internal_node_labels,
                 )
-
-    def debug_compose_tree(self, tree):
-        labelf = lambda x: self.model.encode_lineage(x,
-                set_label=False,
-                add_annotation=False,
-                exclude_supplemental_areas=False)
-        s = tree.as_string(
-                "newick",
-                node_label_compose_fn=self.model.encode_all_areas_lineage,
-                suppress_edge_lengths=True)
-        return s.replace("\n", "")
-
 
 def repeat_run(
         output_prefix,
