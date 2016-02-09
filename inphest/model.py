@@ -642,6 +642,15 @@ class SymbiontLineage(dendropy.Node):
         self._infected_hosts = set()
         self._infected_areas = set()
 
+    def host_occurrences_bitstring(self):
+        s = []
+        for host in self.host_system.host_lineages:
+            if host in self._infected_hosts:
+                s.append("1")
+            else:
+                s.append("0")
+        return "".join(s)
+
     def add_host_in_area(self, host_lineage, area=None):
         """
         Adds a host to the distribution.
@@ -1051,7 +1060,11 @@ class InphestModel(object):
 
     @staticmethod
     def compose_encoded_label(symbiont_lineage):
-        return "s{lineage_index}".format(lineage_index=symbiont_lineage.index)
+        return "s{lineage_index}{sep}{host_occurrences}".format(
+                lineage_index=symbiont_lineage.index,
+                sep=InphestModel._LABEL_COMPONENTS_SEPARATOR,
+                host_occurrences=symbiont_lineage.host_occurrences_bitstring(),
+                )
         return encoding
 
     @staticmethod
