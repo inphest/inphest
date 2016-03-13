@@ -142,8 +142,8 @@ class RateFunction(object):
         if self.definition_content is not None:
             self.compile_function()
 
-    def __call__(self, lineage):
-        return self._compute_rate(lineage)
+    def __call__(self, **kwargs):
+        return self._compute_rate(**kwargs)
 
     def parse_definition(self, rate_function_d):
         rate_function_d = dict(rate_function_d)
@@ -158,7 +158,7 @@ class RateFunction(object):
         self.definition_type = self.definition_type.replace("-", "_")
         if self.definition_type == "fixed_value":
             self.definition_content = float(self.definition_content)
-            self._compute_rate = lambda lineage: self.definition_content
+            self._compute_rate = lambda **kwargs: self.definition_content
         elif self.definition_type == "lambda_definition":
             self._compute_rate = eval(self.definition_content)
         elif self.definition_type == "function_object":
@@ -1173,7 +1173,7 @@ class InphestModel(object):
         else:
             self.symbiont_lineage_birth_rate_function = RateFunction(
                     definition_type="lambda_definition",
-                    definition_content="lambda symbiont_lineage: 0.04",
+                    definition_content="lambda **kwargs: 0.04",
                     description="fixed: 0.04",
                     )
         if run_logger is not None:
@@ -1186,7 +1186,7 @@ class InphestModel(object):
         else:
             self.symbiont_lineage_death_rate_function = RateFunction(
                     definition_type="lambda_definition",
-                    definition_content="lambda symbiont_lineage: 0.0",
+                    definition_content="lambda **kwargs: 0.0",
                     description="fixed: 0.0",
                     )
         if run_logger is not None:
@@ -1208,7 +1208,7 @@ class InphestModel(object):
         else:
             self.symbiont_lineage_host_gain_rate_function = RateFunction(
                     definition_type="lambda_definition",
-                    definition_content="lambda symbiont_lineage: 0.04",
+                    definition_content="lambda **kwargs: 0.04",
                     description="fixed: 0.04",
                     )
         if run_logger is not None:
@@ -1222,7 +1222,7 @@ class InphestModel(object):
         else:
             self.symbiont_lineage_host_loss_rate_function = RateFunction(
                     definition_type="lambda_definition",
-                    definition_content="lambda symbiont_lineage: 0.0",
+                    definition_content="lambda **kwargs: 0.0",
                     description="fixed: 0.0",
                     )
         if run_logger is not None:
@@ -1260,7 +1260,7 @@ class InphestModel(object):
         else:
             self.symbiont_lineage_area_gain_rate_function = RateFunction(
                     definition_type="lambda_definition",
-                    definition_content="lambda lineage: 0.01",
+                    definition_content="lambda **kwargs: 0.01",
                     description="fixed: 0.01",
                     )
         if run_logger is not None:
@@ -1274,7 +1274,7 @@ class InphestModel(object):
         else:
             self.symbiont_lineage_area_loss_rate_function = RateFunction(
                     definition_type="lambda_definition",
-                    definition_content="lambda lineage: 0.0",
+                    definition_content="lambda **kwargs: 0.0",
                     description="fixed: 0.0",
                     )
         if run_logger is not None:
