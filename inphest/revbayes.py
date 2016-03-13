@@ -97,6 +97,7 @@ class RevBayesBiogeographyParser(object):
                     rooting="force-rooted",
                     extract_comment_metadata=False,
                     )
+            tree_entry["tree"] = tree
             tree.encode_bipartitions()
             # print(tree.as_string("newick", suppress_annotations=True))
             tree.calc_node_ages(ultrametricity_precision=0.01)
@@ -114,10 +115,12 @@ class RevBayesBiogeographyParser(object):
                     nd.time = nd.parent_node.time + nd.edge.length
                     edge_entry["edge_start_time"] = nd.parent_node.time
                     edge_entry["is_seed_node"] = False
+                    edge_entry["parent_edge_id"] = int(nd.parent_node.edge.bipartition)
                 else:
                     nd.time = 0.0
                     edge_entry["edge_start_time"] = -1.0
                     edge_entry["is_seed_node"] = True
+                    edge_entry["parent_edge_id"] = None
                 edge_entry["edge_duration"] = nd.edge.length
                 edge_entry["edge_end_time"] = nd.time
                 # edge_entry["edge_duration"] = nd.edge.length

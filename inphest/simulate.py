@@ -60,7 +60,7 @@ class InphestSimulator(object):
         self.model = inphest_model
 
         # initialize host system
-        self.host_system = model.HostSystem(host_regime=self.model.host_regime, run_logger=self.run_logger,)
+        self.host_system = model.HostSystem(host_history=self.model.host_history, run_logger=self.run_logger,)
 
         # track host events
         self.next_host_event = None
@@ -265,8 +265,8 @@ class InphestSimulator(object):
                 time_till_event = self.next_host_event.event_time - self.elapsed_time
                 if self.debug_mode:
                     self.run_logger.debug("Host Event {} of {}: {}".format(
-                        len(self.host_system.host_regime.events)-len(self.host_system.host_events),
-                        len(self.host_system.host_regime.events),
+                        len(self.host_system.host_history.events)-len(self.host_system.host_events),
+                        len(self.host_system.host_history.events),
                         self.next_host_event))
                 event_f = self.process_host_event
                 event_kwargs = {"host_event": self.next_host_event}
@@ -284,7 +284,7 @@ class InphestSimulator(object):
             self.elapsed_time += time_till_event
             if self.model.max_time and self.elapsed_time > self.model.max_time:
                 self.elapsed_time = self.model.max_time
-                assert len(self.processed_host_events) == len(self.host_system.host_regime.events)
+                assert len(self.processed_host_events) == len(self.host_system.host_history.events)
                 assert len(self.host_system.host_events) == 0
                 self.run_logger.info("Termination condition of t = {} reached: storing results and terminating".format(self.elapsed_time))
                 self.store_sample(trees_file=self.trees_file)
@@ -539,7 +539,7 @@ class InphestSimulator(object):
 def repeat_run(
         output_prefix,
         nreps,
-        host_regime_samples_path,
+        host_history_samples_path,
         model_definition_source,
         model_definition_type="python-dict",
         config_d=None,
@@ -561,7 +561,7 @@ def repeat_run(
     config_d : dict
         Simulator configuration parameters as keyword-value pairs. To be
         re-used for each replicate.
-    host_regime_samples_path : object
+    host_history_samples_path : object
         Path to host biogeographical history samples.
     model_definition_source : object
         See 'model_definition_type' argument for values this can take.
@@ -631,20 +631,20 @@ def repeat_run(
     if config_d.get("store_trees", True) and "trees_file" not in config_d:
         config_d["trees_file"] = open(InphestSimulator.compose_trees_filepath(output_prefix), "w")
 
-    host_regime_samples_path = os.path.normpath(host_regime_samples_path)
-    run_logger.info("-inphest- Using host biogeographical regime samples from: {}".format(host_regime_samples_path))
-    hrs = model.HostRegimeSamples()
+    host_history_samples_path = os.path.normpath(host_history_samples_path)
+    run_logger.info("-inphest- Using host biogeographical regime samples from: {}".format(host_history_samples_path))
+    hrs = model.HostHistorySamples()
     rb_data_src = open(rb_data, "r")
     hrs.parse_host_biogeography(rb_data_src)
-    # run_logger.info("-inphest- {} host biogeographical regime samples found in source '{}'".format(len(hrs.host_regimes), host_regime_samples_path))
-    run_logger.info("-inphest- {} host biogeographical regime samples found in source".format(len(hrs.host_regimes), host_regime_samples_path))
+    # run_logger.info("-inphest- {} host biogeographical regime samples found in source '{}'".format(len(hrs.host_histories), host_history_samples_path))
+    run_logger.info("-inphest- {} host biogeographical regime samples found in source".format(len(hrs.host_histories), host_history_samples_path))
 
     current_rep = 0
     while current_rep < nreps:
-        for host_regime_idx, host_regime in enumerate(hrs.host_regimes):
-            simulation_name="Run_{}_{}".format(current_rep+1, host_regime_idx+1)
-            run_output_prefix = "{}.R{:04d}.H{:04d}".format(output_prefix, current_rep+1, host_regime_idx+1)
-            run_logger.info("-inphest- Replicate {} of {}, host regime {} of {}: Starting".format(current_rep+1, nreps, host_regime_idx+1, len(hrs.host_regimes)))
+        for host_history_idx, host_history in enumerate(hrs.host_histories):
+            simulation_name="Run_{}_{}".format(current_rep+1, host_history_idx+1)
+            run_output_prefix = "{}.R{:04d}.H{:04d}".format(output_prefix, current_rep+1, host_history_idx+1)
+            run_logger.info("-inphest- Replicate {} of {}, host regime {} of {}: Starting".format(current_rep+1, nreps, host_history_idx+1, len(hrs.host_histories)))
             num_restarts = 0
             while True:
                 if num_restarts == 0 and current_rep == 0:
@@ -654,7 +654,7 @@ def repeat_run(
                     is_verbose_setup = False
                     model_setup_logger = None
                 inphest_model = model.InphestModel.create(
-                        host_regime=host_regime,
+                        host_history=host_history,
                         model_definition_source=model_definition_source,
                         model_definition_type=model_definition_type,
                         interpolate_missing_model_values=interpolate_missing_model_values,
@@ -675,16 +675,16 @@ def repeat_run(
                     run_logger.system = None
                 except error.InphestException as e:
                     run_logger.system = None
-                    run_logger.info("-inphest- Replicate {} of {}, host regime {} of {}: Simulation failure before termination condition at t = {}: {}".format(current_rep+1, nreps, host_regime_idx+1, len(hrs.host_regimes), inphest_simulator.elapsed_time, e))
+                    run_logger.info("-inphest- Replicate {} of {}, host regime {} of {}: Simulation failure before termination condition at t = {}: {}".format(current_rep+1, nreps, host_history_idx+1, len(hrs.host_histories), inphest_simulator.elapsed_time, e))
                     num_restarts += 1
                     if num_restarts > maximum_num_restarts_per_replicates:
-                        run_logger.info("-inphest- Replicate {} of {}, host regime {} of {}: Maximum number of restarts exceeded: aborting".format(current_rep+1, nreps, host_regime_idx+1, len(hrs.host_regimes)))
+                        run_logger.info("-inphest- Replicate {} of {}, host regime {} of {}: Maximum number of restarts exceeded: aborting".format(current_rep+1, nreps, host_history_idx+1, len(hrs.host_histories)))
                         break
                     else:
-                        run_logger.info("-inphest- Replicate {} of {}, host regime {} of {}: Restarting replicate (number of restarts: {})".format(current_rep+1, nreps, host_regime_idx+1, len(hrs.host_regimes), num_restarts))
+                        run_logger.info("-inphest- Replicate {} of {}, host regime {} of {}: Restarting replicate (number of restarts: {})".format(current_rep+1, nreps, host_history_idx+1, len(hrs.host_histories), num_restarts))
                 else:
                     run_logger.system = None
-                    run_logger.info("-inphest- Replicate {} of {}, host regime {} of {}: Completed to termination condition at t = {}".format(current_rep+1, nreps, host_regime_idx+1, len(hrs.host_regimes), inphest_simulator.elapsed_time))
+                    run_logger.info("-inphest- Replicate {} of {}, host regime {} of {}: Completed to termination condition at t = {}".format(current_rep+1, nreps, host_history_idx+1, len(hrs.host_histories), inphest_simulator.elapsed_time))
                     num_restarts = 0
                     break
         current_rep += 1
@@ -698,7 +698,7 @@ if __name__ == "__main__":
     repeat_run(
         output_prefix="test",
         nreps=1,
-        host_regime_samples_path=rb_data,
+        host_history_samples_path=rb_data,
         model_definition_source={},
         model_definition_type="python-dict",
         config_d=None,
@@ -709,13 +709,13 @@ if __name__ == "__main__":
         maximum_num_restarts_per_replicates=100,
         debug_mode=True)
 
-    # hrs = model.HostRegimeSamples()
+    # hrs = model.HostHistorySamples()
     # rb_data = os.path.join(utility.TEST_DATA_PATH, "revbayes", "bg_large.events.txt")
     # rb_data_src = open(rb_data, "r")
     # hrs.parse_host_biogeography(rb_data_src)
-    # for host_regime in hrs.host_regimes:
+    # for host_history in hrs.host_histories:
     #     im = model.InphestModel.create(
-    #             host_regime=host_regime,
+    #             host_history=host_history,
     #             model_definition_source={},
     #             model_definition_type="python-dict",
     #             )

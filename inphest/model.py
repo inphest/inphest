@@ -176,14 +176,15 @@ class RateFunction(object):
         d["description"] = self.description
         return d
 
-class HostRegime(object):
+class HostHistory(object):
     """
     A particular host history on which the symbiont history is conditioned.
     """
 
-    HostRegimeLineageDefinition = collections.namedtuple("HostRegimeLineageDefinition", [
+    HostLineageDefinition = collections.namedtuple("HostLineageDefinition", [
         # "tree_idx",                 #   identifer of tree from which this lineage has been sampled (same lineage, as given by split id will occur on different trees/histories)
         "lineage_id",               #   lineage (edge/split) id on which event occurs
+        "lineage_parent_id",
         "leafset_bitstring",
         "split_bitstring",
         "rb_index",
@@ -213,11 +214,23 @@ class HostRegime(object):
         else:
             self.taxon_namespace = taxon_namespace
         self.events = [] # collection of HostEvent objects, sorted by time
-        self.lineages = {} # keys: lineage_id (== int(Bipartition) == Bipartition.bitmask); values: HostRegimeLineageDefinition
+        self.lineages = {} # keys: lineage_id (== int(Bipartition) == Bipartition.split_bitmask); values: HostLineageDefinition
         self.start_time = None
         self.end_time = None
 
-    def compile(self, start_time, end_time):
+    def compile(self, tree, start_time, end_time):
+        self.tree = tree
+        ndm = self.tree.node_distance_matrix()
+        self.lineage_distance_matrix = {}
+        for node1 in ndm:
+            key1 = int(node1.edge.bipartition.split_bitmask)
+            assert key1 in self.lineages
+            if key1 not in self.lineage_distance_matrix:
+                self.lineage_distance_matrix[key1] = {}
+            for node2 in ndm:
+                key2 = int(node2.edge.bipartition.split_bitmask)
+                assert key2 in self.lineages
+                self.lineage_distance_matrix[key1][key2] = ndm.patristic_distance(node1, node2)
         self.start_time = start_time
         self.end_time = end_time
         self.events.sort(key=lambda x: x.event_time, reverse=False)
@@ -254,13 +267,13 @@ class HostRegime(object):
                 elif event.event_type == "cladogenesis":
                     assert "".join(distribution_bitlist) == self.lineages[lineage_id].lineage_start_distribution_bitstring
 
-class HostRegimeSamples(object):
+class HostHistorySamples(object):
     """
     A collection of host histories, one a single one of each a particular symbiont history will be conditioned.
     """
 
     def __init__(self):
-        self.host_regimes = []
+        self.host_histories = []
         self.taxon_namespace = dendropy.TaxonNamespace()
 
     def parse_host_biogeography(self,
@@ -279,16 +292,17 @@ class HostRegimeSamples(object):
         # for tree_entry in rb.tree_entries:
         #     self.tree_probabilities.append(tree_entry["posterior"]/total_tree_ln_likelihoods)
 
-        tree_host_regimes = {}
+        tree_host_histories = {}
         # tree_root_heights = {}
         for edge_entry in rb.edge_entries:
             tree_idx = edge_entry["tree_idx"]
-            if tree_idx not in tree_host_regimes:
-                tree_host_regimes[tree_idx] = HostRegime(taxon_namespace=self.taxon_namespace)
+            if tree_idx not in tree_host_histories:
+                tree_host_histories[tree_idx] = HostHistory(taxon_namespace=self.taxon_namespace)
             lineage_id = edge_entry["edge_id"]
-            lineage = HostRegime.HostRegimeLineageDefinition(
+            lineage = HostHistory.HostLineageDefinition(
                     # tree_idx=edge_entry["tree_idx"],
                     lineage_id=lineage_id,
+                    lineage_parent_id=edge_entry["parent_edge_id"],
                     leafset_bitstring=edge_entry["leafset_bitstring"],
                     split_bitstring=edge_entry["split_bitstring"],
                     rb_index=edge_entry["rb_index"],
@@ -299,9 +313,9 @@ class HostRegimeSamples(object):
                     is_seed_node=edge_entry["is_seed_node"],
                     is_leaf=edge_entry["is_leaf"],
                     )
-            assert lineage.lineage_id not in tree_host_regimes[tree_idx].lineages
+            assert lineage.lineage_id not in tree_host_histories[tree_idx].lineages
             assert lineage.lineage_start_time <= lineage.lineage_end_time, "{}, {}".format(lineage.lineage_start_time, lineage.lineage_end_time)
-            tree_host_regimes[tree_idx].lineages[lineage_id] = lineage
+            tree_host_histories[tree_idx].lineages[lineage_id] = lineage
             # try:
             #     tree_root_heights[tree_idx] = max(edge_entry["edge_ending_age"], tree_root_heights[tree_idx])
             # except KeyError:
@@ -309,9 +323,9 @@ class HostRegimeSamples(object):
 
         for event_entry in rb.event_schedules_across_all_trees:
             tree_idx = event_entry["tree_idx"]
-            if tree_idx not in tree_host_regimes:
-                tree_host_regimes[tree_idx] = HostRegime(taxon_namespace=self.taxon_namespace)
-            event = HostRegime.HostEvent(
+            if tree_idx not in tree_host_histories:
+                tree_host_histories[tree_idx] = HostHistory(taxon_namespace=self.taxon_namespace)
+            event = HostHistory.HostEvent(
                 # tree_idx=event_entry["tree_idx"],
                 event_time=event_entry["time"],
                 # weight=self.tree_probabilities[event_entry["tree_idx"]],
@@ -323,19 +337,20 @@ class HostRegimeSamples(object):
                 child0_lineage_id=event_entry.get("child0_edge_id", None),
                 child1_lineage_id=event_entry.get("child1_edge_id", None),
                 )
-            assert event.lineage_id in tree_host_regimes[tree_idx].lineages
-            tree_host_regimes[tree_idx].events.append(event)
+            assert event.lineage_id in tree_host_histories[tree_idx].lineages
+            tree_host_histories[tree_idx].events.append(event)
 
-        for tree_idx in tree_host_regimes:
-            host_regime = tree_host_regimes[tree_idx]
+        for tree_idx in tree_host_histories:
+            host_history = tree_host_histories[tree_idx]
             end_time = max(rb.tree_entries[tree_idx]["seed_node_age"], rb.max_event_times[tree_idx])
-            host_regime.compile(
+            host_history.compile(
+                    tree=rb.tree_entries[tree_idx]["tree"],
                     start_time=0.0,
                     end_time=end_time,
                     )
             if validate:
-                host_regime.validate()
-            self.host_regimes.append(host_regime)
+                host_history.validate()
+            self.host_histories.append(host_history)
 
 class Area(object):
 
@@ -360,21 +375,22 @@ class HostLineage(object):
     """
 
     def __init__(self,
-            host_regime_lineage_definition,
+            host_history_lineage_definition,
             host_system,
             debug_mode):
-        self.host_regime_lineage_definition = host_regime_lineage_definition
+        self.host_history_lineage_definition = host_history_lineage_definition
         self.host_system = host_system
-        self.lineage_id = host_regime_lineage_definition.lineage_id
-        self.leafset_bitstring = host_regime_lineage_definition.leafset_bitstring
-        self.split_bitstring = host_regime_lineage_definition.split_bitstring
-        self.rb_index = host_regime_lineage_definition.rb_index
-        self.start_time = host_regime_lineage_definition.lineage_start_time
-        self.end_time = host_regime_lineage_definition.lineage_end_time
-        self.start_distribution_bitstring = host_regime_lineage_definition.lineage_start_distribution_bitstring
-        self.end_distribution_bitstring = host_regime_lineage_definition.lineage_end_distribution_bitstring
-        self.is_seed_node = host_regime_lineage_definition.is_seed_node
-        self.is_leaf = host_regime_lineage_definition.is_leaf
+        self.lineage_id = host_history_lineage_definition.lineage_id
+        self.lineage_parent_id = host_history_lineage_definition.lineage_parent_id
+        self.leafset_bitstring = host_history_lineage_definition.leafset_bitstring
+        self.split_bitstring = host_history_lineage_definition.split_bitstring
+        self.rb_index = host_history_lineage_definition.rb_index
+        self.start_time = host_history_lineage_definition.lineage_start_time
+        self.end_time = host_history_lineage_definition.lineage_end_time
+        self.start_distribution_bitstring = host_history_lineage_definition.lineage_start_distribution_bitstring
+        self.end_distribution_bitstring = host_history_lineage_definition.lineage_end_distribution_bitstring
+        self.is_seed_node = host_history_lineage_definition.is_seed_node
+        self.is_leaf = host_history_lineage_definition.is_leaf
         self._current_areas = set()
         self.extancy = "pre"
         self.debug_mode = False
@@ -536,15 +552,15 @@ class HostLineage(object):
 class HostSystem(object):
     """
     Models the the collection of hosts for a particular simulation replicate,
-    based on a HostRegime. The HostRegime provides the basic invariant
+    based on a HostHistory. The HostHistory provides the basic invariant
     definitions/rules that apply across all replicates, while the HostSystem
     tracks state etc. for a single replicate.
     """
 
     def __init__(self,
-            host_regime,
+            host_history,
             run_logger=None):
-        self.compile(host_regime)
+        self.compile(host_history)
         # if self.debug_mode:
         #     ## setup for checking initial distributions ##
         #     self.check_lineage_distributions = {}
@@ -553,18 +569,18 @@ class HostSystem(object):
         #         self.debug_check_initial_distribution(host_lineage)
         self._next_host_event = None
 
-    def compile(self, host_regime, debug_mode=False):
-        self.host_regime = host_regime
-        self.start_time = self.host_regime.start_time
-        self.end_time = self.host_regime.end_time
+    def compile(self, host_history, debug_mode=False):
+        self.host_history = host_history
+        self.start_time = self.host_history.start_time
+        self.end_time = self.host_history.end_time
         num_areas = None
 
         # build areas
-        for host_regime_lineage_id_definition in self.host_regime.lineages.values():
+        for host_history_lineage_id_definition in self.host_history.lineages.values():
             if num_areas is None:
-                num_areas = len(host_regime_lineage_id_definition.lineage_start_distribution_bitstring)
-            assert num_areas == len(host_regime_lineage_id_definition.lineage_start_distribution_bitstring)
-            assert num_areas == len(host_regime_lineage_id_definition.lineage_end_distribution_bitstring)
+                num_areas = len(host_history_lineage_id_definition.lineage_start_distribution_bitstring)
+            assert num_areas == len(host_history_lineage_id_definition.lineage_start_distribution_bitstring)
+            assert num_areas == len(host_history_lineage_id_definition.lineage_end_distribution_bitstring)
         self.num_areas = num_areas
         self.areas = []
         for area_idx in range(self.num_areas):
@@ -582,9 +598,9 @@ class HostSystem(object):
         self.host_lineages_by_id = {}
         self.leaf_host_lineages = set()
         self.seed_host_lineage = None
-        for host_regime_lineage_id_definition in self.host_regime.lineages.values():
+        for host_history_lineage_id_definition in self.host_history.lineages.values():
             host = HostLineage(
-                    host_regime_lineage_definition=host_regime_lineage_id_definition,
+                    host_history_lineage_definition=host_history_lineage_id_definition,
                     host_system=self,
                     debug_mode=debug_mode,
                     )
@@ -597,7 +613,7 @@ class HostSystem(object):
                 self.leaf_host_lineages.add(host)
 
         # local copy of host events
-        self.host_events = list(self.host_regime.events)
+        self.host_events = list(self.host_history.events)
 
     def extant_host_lineages_at_current_time(self, current_time):
         ## TODO: if we hit this often, we need to construct a look-up table
@@ -985,7 +1001,7 @@ class InphestModel(object):
     @classmethod
     def create(
             cls,
-            host_regime,
+            host_history,
             model_definition_source,
             model_definition_type,
             interpolate_missing_model_values=False,
@@ -1018,13 +1034,13 @@ class InphestModel(object):
         Example
         -------
 
-            hrs = HostRegimeSamples()
+            hrs = HostHistorySamples()
             rb_data = os.path.join(utility.TEST_DATA_PATH, "revbayes", "bg_large.events.txt")
             rb_data_src = open(rb_data, "r")
             hrs.parse_host_biogeography(rb_data_src)
-            for host_regime in hrs.host_regimes:
+            for host_history in hrs.host_histories:
                 im = InphestModel.create(
-                        host_regime=host_regime,
+                        host_history=host_history,
                         model_definition_source="model1.json",
                         model_definition_type="json",
                         )
@@ -1043,21 +1059,21 @@ class InphestModel(object):
         else:
             raise ValueError("Unrecognized model definition type: '{}'".format(model_definition_type))
         return cls.from_definition_dict(
-                host_regime=host_regime,
+                host_history=host_history,
                 model_definition=model_definition,
                 run_logger=run_logger,
                 interpolate_missing_model_values=interpolate_missing_model_values)
 
     @classmethod
     def from_definition_dict(cls,
-            host_regime,
+            host_history,
             model_definition,
             interpolate_missing_model_values=False,
             run_logger=None):
         archipelago_model = cls()
         archipelago_model.parse_definition(
                 model_definition=model_definition,
-                host_regime=host_regime,
+                host_history=host_history,
                 interpolate_missing_model_values=interpolate_missing_model_values,
                 run_logger=run_logger,
         )
@@ -1126,7 +1142,7 @@ class InphestModel(object):
 
     def parse_definition(self,
             model_definition,
-            host_regime,
+            host_history,
             run_logger=None,
             interpolate_missing_model_values=True):
 
@@ -1146,7 +1162,7 @@ class InphestModel(object):
             run_logger.info("Setting up model with identifier: '{}'".format(self.model_id))
 
         # host regime
-        self.host_regime = host_regime
+        self.host_history = host_history
 
         # Diversification
 
@@ -1285,7 +1301,7 @@ class InphestModel(object):
             run_logger.info("(CLADOGENETIC GEOGRAPHICAL RANGE EVOLUTION) Base weight of founder event speciation ('jump dispersal') mode: {} (note that the effective weight of this event for each lineage is actually the product of this and the lineage-specific area gain weight)".format(self.cladogenesis_founder_event_speciation_weight))
 
         termination_conditions_d = dict(model_definition.pop("termination_conditions", {}))
-        self.max_time = termination_conditions_d.pop("max_time", self.host_regime.end_time)
+        self.max_time = termination_conditions_d.pop("max_time", self.host_history.end_time)
         desc = "Simulation will terminate at time t = {}".format(self.max_time)
         if run_logger is not None:
             run_logger.info(desc)
@@ -1363,13 +1379,13 @@ class InphestModel(object):
         return d
 
 if __name__ == "__main__":
-    hrs = HostRegimeSamples()
+    hrs = HostHistorySamples()
     rb_data = os.path.join(utility.TEST_DATA_PATH, "revbayes", "bg_large.events.txt")
     rb_data_src = open(rb_data, "r")
     hrs.parse_host_biogeography(rb_data_src)
-    for host_regime in hrs.host_regimes:
+    for host_history in hrs.host_histories:
         im = InphestModel.create(
-                host_regime=host_regime,
+                host_history=host_history,
                 model_definition_source={},
                 model_definition_type="python-dict",
                 )
