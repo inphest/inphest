@@ -1199,12 +1199,24 @@ class InphestModel(object):
 
         ## Anagenetic Host Evolution Submodel
 
-        anagenetic_host_range_evolution_d = dict(model_definition.pop("anagenetic_host_range_evolution", {}))
+        anagenetic_host_assemblage_evolution_d = dict(model_definition.pop("anagenetic_host_assemblage_evolution", {}))
 
         ### Anagenetic Host Gain
 
-        if "symbiont_lineage_host_gain_rate" in anagenetic_host_range_evolution_d:
-            self.symbiont_lineage_host_gain_rate_function = RateFunction.from_definition_dict(anagenetic_host_range_evolution_d.pop("symbiont_lineage_host_gain_rate"))
+        if "mean_symbiont_lineage_host_gain_rate" in anagenetic_host_assemblage_evolution_d:
+            self.mean_symbiont_lineage_host_gain_rate = RateFunction.from_definition_dict(anagenetic_host_assemblage_evolution_d.pop("symbiont_lineage_host_gain_rate"))
+        else:
+            self.mean_symbiont_lineage_host_gain_rate = RateFunction(
+                    definition_type="lambda_definition",
+                    definition_content="lambda **kwargs:1.0",
+                    description="fixed: 1.0",
+                    )
+        if run_logger is not None:
+            run_logger.info("(ANAGENETIC HOST ASSEMBLAGE EVOLUTION) Setting mean host gain rate: {desc}".format(
+                desc=self.mean_symbiont_lineage_host_gain_rate.description,))
+
+        if "symbiont_lineage_host_gain_rate" in anagenetic_host_assemblage_evolution_d:
+            self.symbiont_lineage_host_gain_rate_function = RateFunction.from_definition_dict(anagenetic_host_assemblage_evolution_d.pop("symbiont_lineage_host_gain_rate"))
         else:
             self.symbiont_lineage_host_gain_rate_function = RateFunction(
                     definition_type="lambda_definition",
@@ -1212,13 +1224,13 @@ class InphestModel(object):
                     description="fixed: 0.04",
                     )
         if run_logger is not None:
-            run_logger.info("(ANAGENETIC HOST RANGE EVOLUTION) Setting symbiont lineage-specific host gain weight function: {desc}".format(
+            run_logger.info("(ANAGENETIC HOST ASSEMBLAGE EVOLUTION) Setting symbiont lineage-specific host gain weight function: {desc}".format(
                 desc=self.symbiont_lineage_host_gain_rate_function.description,))
 
         ### Anagenetic Host Loss
 
-        if "symbiont_lineage_host_loss_rate" in anagenetic_host_range_evolution_d:
-            self.symbiont_lineage_host_loss_rate_function = RateFunction.from_definition_dict(anagenetic_host_range_evolution_d.pop("symbiont_lineage_host_loss_rate"))
+        if "symbiont_lineage_host_loss_rate" in anagenetic_host_assemblage_evolution_d:
+            self.symbiont_lineage_host_loss_rate_function = RateFunction.from_definition_dict(anagenetic_host_assemblage_evolution_d.pop("symbiont_lineage_host_loss_rate"))
         else:
             self.symbiont_lineage_host_loss_rate_function = RateFunction(
                     definition_type="lambda_definition",
@@ -1226,27 +1238,27 @@ class InphestModel(object):
                     description="fixed: 0.0",
                     )
         if run_logger is not None:
-            run_logger.info("(ANAGENETIC HOST RANGE EVOLUTION) Setting symbiont lineage-specific host loss weight function: {desc}".format(
+            run_logger.info("(ANAGENETIC HOST ASSEMBLAGE EVOLUTION) Setting symbiont lineage-specific host loss weight function: {desc}".format(
                 desc=self.symbiont_lineage_host_loss_rate_function.description,
                 ))
 
-        if anagenetic_host_range_evolution_d:
-            raise TypeError("Unsupported keywords in anagenetic host range evolution submodel: {}".format(anagenetic_host_range_evolution_d))
+        if anagenetic_host_assemblage_evolution_d:
+            raise TypeError("Unsupported keywords in anagenetic host range evolution submodel: {}".format(anagenetic_host_assemblage_evolution_d))
 
         ## Cladogenetic Host Evolution Submodel
 
-        cladogenetic_host_range_evolution = dict(model_definition.pop("cladogenetic_host_range_evolution", {}))
-        self.cladogenesis_sympatric_subset_speciation_weight = float(cladogenetic_host_range_evolution.pop("sympatric_subset_speciation_weight", 1.0))
-        self.cladogenesis_single_host_vicariance_speciation_weight = float(cladogenetic_host_range_evolution.pop("single_host_vicariance_speciation_weight", 1.0))
-        self.cladogenesis_widespread_vicariance_speciation_weight = float(cladogenetic_host_range_evolution.pop("widespread_vicariance_speciation_weight", 1.0))
-        self.cladogenesis_founder_event_speciation_weight = float(cladogenetic_host_range_evolution.pop("founder_event_speciation_weight", 0.0))
-        if cladogenetic_host_range_evolution:
-            raise TypeError("Unsupported keywords in cladogenetic range evolution submodel: {}".format(cladogenetic_host_range_evolution))
+        cladogenetic_host_assemblage_evolution = dict(model_definition.pop("cladogenetic_host_assemblage_evolution", {}))
+        self.host_cladogenesis_sympatric_subset_speciation_weight = float(cladogenetic_host_assemblage_evolution.pop("sympatric_subset_speciation_weight", 1.0))
+        self.host_cladogenesis_single_host_vicariance_speciation_weight = float(cladogenetic_host_assemblage_evolution.pop("single_host_vicariance_speciation_weight", 1.0))
+        self.host_cladogenesis_widespread_vicariance_speciation_weight = float(cladogenetic_host_assemblage_evolution.pop("widespread_vicariance_speciation_weight", 1.0))
+        self.host_cladogenesis_founder_event_speciation_weight = float(cladogenetic_host_assemblage_evolution.pop("founder_event_speciation_weight", 0.0))
+        if cladogenetic_host_assemblage_evolution:
+            raise TypeError("Unsupported keywords in cladogenetic range evolution submodel: {}".format(cladogenetic_host_assemblage_evolution))
         if run_logger is not None:
-            run_logger.info("(CLADOGENETIC HOST RANGE EVOLUTION) Base weight of sympatric subset speciation mode: {}".format(self.cladogenesis_sympatric_subset_speciation_weight))
-            run_logger.info("(CLADOGENETIC HOST RANGE EVOLUTION) Base weight of single host vicariance speciation mode: {}".format(self.cladogenesis_single_host_vicariance_speciation_weight))
-            run_logger.info("(CLADOGENETIC HOST RANGE EVOLUTION) Base weight of widespread vicariance speciation mode: {}".format(self.cladogenesis_widespread_vicariance_speciation_weight))
-            run_logger.info("(CLADOGENETIC HOST RANGE EVOLUTION) Base weight of founder event speciation ('jump dispersal') mode: {} (note that the effective weight of this event for each lineage is actually the product of this and the lineage-specific host gain weight)".format(self.cladogenesis_founder_event_speciation_weight))
+            run_logger.info("(CLADOGENETIC HOST ASSEMBLAGE EVOLUTION) Base weight of sympatric subset speciation mode: {}".format(self.host_cladogenesis_sympatric_subset_speciation_weight))
+            run_logger.info("(CLADOGENETIC HOST ASSEMBLAGE EVOLUTION) Base weight of single host vicariance speciation mode: {}".format(self.host_cladogenesis_single_host_vicariance_speciation_weight))
+            run_logger.info("(CLADOGENETIC HOST ASSEMBLAGE EVOLUTION) Base weight of widespread vicariance speciation mode: {}".format(self.host_cladogenesis_widespread_vicariance_speciation_weight))
+            run_logger.info("(CLADOGENETIC HOST ASSEMBLAGE EVOLUTION) Base weight of founder event speciation ('jump dispersal') mode: {} (note that the effective weight of this event for each lineage is actually the product of this and the lineage-specific host gain weight)".format(self.host_cladogenesis_founder_event_speciation_weight))
 
         # Geographical Range Evolution Submodel
 
@@ -1287,18 +1299,18 @@ class InphestModel(object):
 
         ## Cladogenetic Geographical Evolution Submodel
 
-        cladogenesis_geographical_range_evolution_d = dict(model_definition.pop("cladogenetic_geographical_range_evolution", {}))
-        self.cladogenesis_sympatric_subset_speciation_weight = float(cladogenesis_geographical_range_evolution_d.pop("sympatric_subset_speciation_weight", 1.0))
-        self.cladogenesis_single_area_vicariance_speciation_weight = float(cladogenesis_geographical_range_evolution_d.pop("single_area_vicariance_speciation_weight", 1.0))
-        self.cladogenesis_widespread_vicariance_speciation_weight = float(cladogenesis_geographical_range_evolution_d.pop("widespread_vicariance_speciation_weight", 1.0))
-        self.cladogenesis_founder_event_speciation_weight = float(cladogenesis_geographical_range_evolution_d.pop("founder_event_speciation_weight", 0.0))
-        if cladogenesis_geographical_range_evolution_d:
-            raise TypeError("Unsupported keywords in cladogenetic geographical range evolution submodel: {}".format(cladogenesis_geographical_range_evolution_d))
+        symbiont_cladogenetic_geographical_range_evolution_d = dict(model_definition.pop("cladogenetic_geographical_range_evolution", {}))
+        self.symbiont_cladogenesis_sympatric_subset_speciation_weight = float(symbiont_cladogenetic_geographical_range_evolution_d.pop("sympatric_subset_speciation_weight", 1.0))
+        self.symbiont_cladogenesis_single_area_vicariance_speciation_weight = float(symbiont_cladogenetic_geographical_range_evolution_d.pop("single_area_vicariance_speciation_weight", 1.0))
+        self.symbiont_cladogenesis_widespread_vicariance_speciation_weight = float(symbiont_cladogenetic_geographical_range_evolution_d.pop("widespread_vicariance_speciation_weight", 1.0))
+        self.symbiont_cladogenesis_founder_event_speciation_weight = float(symbiont_cladogenetic_geographical_range_evolution_d.pop("founder_event_speciation_weight", 0.0))
+        if symbiont_cladogenetic_geographical_range_evolution_d:
+            raise TypeError("Unsupported keywords in cladogenetic geographical range evolution submodel: {}".format(symbiont_cladogenetic_geographical_range_evolution_d))
         if run_logger is not None:
-            run_logger.info("(CLADOGENETIC GEOGRAPHICAL RANGE EVOLUTION) Base weight of sympatric subset speciation mode: {}".format(self.cladogenesis_sympatric_subset_speciation_weight))
-            run_logger.info("(CLADOGENETIC GEOGRAPHICAL RANGE EVOLUTION) Base weight of single area vicariance speciation mode: {}".format(self.cladogenesis_single_area_vicariance_speciation_weight))
-            run_logger.info("(CLADOGENETIC GEOGRAPHICAL RANGE EVOLUTION) Base weight of widespread vicariance speciation mode: {}".format(self.cladogenesis_widespread_vicariance_speciation_weight))
-            run_logger.info("(CLADOGENETIC GEOGRAPHICAL RANGE EVOLUTION) Base weight of founder event speciation ('jump dispersal') mode: {} (note that the effective weight of this event for each lineage is actually the product of this and the lineage-specific area gain weight)".format(self.cladogenesis_founder_event_speciation_weight))
+            run_logger.info("(CLADOGENETIC GEOGRAPHICAL RANGE EVOLUTION) Base weight of sympatric subset speciation mode: {}".format(self.symbiont_cladogenesis_sympatric_subset_speciation_weight))
+            run_logger.info("(CLADOGENETIC GEOGRAPHICAL RANGE EVOLUTION) Base weight of single area vicariance speciation mode: {}".format(self.symbiont_cladogenesis_single_area_vicariance_speciation_weight))
+            run_logger.info("(CLADOGENETIC GEOGRAPHICAL RANGE EVOLUTION) Base weight of widespread vicariance speciation mode: {}".format(self.symbiont_cladogenesis_widespread_vicariance_speciation_weight))
+            run_logger.info("(CLADOGENETIC GEOGRAPHICAL RANGE EVOLUTION) Base weight of founder event speciation ('jump dispersal') mode: {} (note that the effective weight of this event for each lineage is actually the product of this and the lineage-specific area gain weight)".format(self.symbiont_cladogenesis_founder_event_speciation_weight))
 
         termination_conditions_d = dict(model_definition.pop("termination_conditions", {}))
         self.max_time = termination_conditions_d.pop("max_time", self.host_history.end_time)

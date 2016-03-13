@@ -332,23 +332,44 @@ class InphestSimulator(object):
 
             #---
             # Diversification Process: Birth (Speciation)
-            speciation_rate = self.model.symbiont_lineage_birth_rate_function(lineage=lineage, simulation_elapsed_time=self.elapsed_time)
+            speciation_rate = self.model.symbiont_lineage_birth_rate_function(symbiont_lineage=lineage, simulation_elapsed_time=self.elapsed_time)
             if speciation_rate:
                 event_calls.append( (self.phylogeny.split_lineage, {"symbiont_lineage": lineage}) )
                 event_rates.append(speciation_rate)
 
             #---
             # Diversification Process: Death (Extinction)
-            extinction_rate = self.model.symbiont_lineage_death_rate_function(lineage=lineage, simulation_elapsed_time=self.elapsed_time)
+            extinction_rate = self.model.symbiont_lineage_death_rate_function(symbiont_lineage=lineage, simulation_elapsed_time=self.elapsed_time)
             if extinction_rate:
                 event_calls.append( (self.phylogeny.extinguish_lineage, {"symbiont_lineage": lineage}) )
                 event_rates.append(extinction_rate)
 
             #---
             # Anagenetic Host Set Evolution: Host Gain
-            ## Note: a little more complicated than might be immediately needs, to allow
-            ## for the fact that "rate" might need to be adjusted to reflect a
-            ## "global infection rate", i.e., across all host/area.
+            # ----------------------------------------
+            # Submodel Design Objectives:
+            # 1.    We want to be able to specify that the rate of gaining a
+            #       particular host in a particular area as functions of:
+            #       -   The area (e.g., the number of host lineages in the area; the
+            #           number of symbiont lineages in the area; or the particular
+            #           host or symbiont lineages present/absent from an area).
+            #       -   The source and destination hosts (e.g., the phylogenetic
+            #           distances between the source and destination hosts; the
+            #           number of symbiont lineages in the destination host; etc.)
+            # 2.    We want to be able to specify a mean per-lineage rate of
+            #       transmission. Allows for estimating this from empirical data
+            #       using some reasonable if simplified and low-fidelity model:
+            #       e.g., as a per-lineage trait evolution rate, where the host set
+            #       is a multistate character.
+            # Objective (1) means that the rates must be calculated on a
+            # per-source host per-destination host per area basis.
+            # Objective (2) means that the transmission (host gain) rate
+            # weights across all host gain events needs to sum to 1 (with the
+            # actual rate obtained by multiplying with the system-wide mean
+            # (per-lineage) host gain rate.)
+            # NOTE: this can be optimized! Right now, more a naive
+            # reference implementation of the logic.
+            # NOTE: this needs to be tested.
             infected_hosts = {}
             uninfected_hosts = {}
             num_potential_new_host_infection_events = 0
@@ -358,26 +379,34 @@ class InphestSimulator(object):
                 for host_lineage in area.host_lineages:
                     if self.debug_mode:
                         host_lineage.assert_correctly_extant(simulation_elapsed_time=self.elapsed_time)
-                    if lineage.has_host(host_lineage):
+                    if lineage.has_host_in_area(host_lineage, area):
                         infected_hosts[area].append( host_lineage )
                     else:
                         uninfected_hosts[area].append( host_lineage )
                     num_potential_new_host_infection_events += ( len(uninfected_hosts[area]) * len(infected_hosts[area]) )
+            sum_of_weights = 0.0
             if num_potential_new_host_infection_events > 0:
-                # Here, if needed, we can adjust the rate to model a global infection rate
-                # rather than a per-event infection rate.
-                per_area_host_infection_rate = self.model.symbiont_lineage_host_gain_rate_function(lineage=lineage, simulation_elapsed_time=self.elapsed_time) / num_potential_new_host_infection_events
-                # If we stick to a per-event infection rate, this loop can, of course,
-                # be merged with the previous one.
+                transmission_event_calls = []
+                transmission_event_rates = []
                 for area in lineage.area_iter():
                     for src_host in infected_hosts[area]:
                         for dest_host in uninfected_hosts[area]:
-                            event_calls.append( (lineage.add_host_in_area,  {"host_lineage": dest_host, "area": area,}) )
-                            event_rates.append(per_area_host_infection_rate)
+                            rate = self.model.symbiont_lineage_host_gain_rate_function(
+                                    symbiont_lineage=lineage,
+                                    from_host_lineage=src_host,
+                                    to_host_lineage=dest_host,
+                                    area=area,
+                                    simulation_elapsed_time=self.elapsed_time)
+                            transmission_event_calls.append( (lineage.add_host_in_area,  {"host_lineage": dest_host, "area": area,}) )
+                            transmission_event_rates.append(rate)
+                nf = float(sum(transmission_event_rates))
+                transmission_event_rates = [tvr / nf for tvr in transmission_event_rates]
+                event_calls.extend( transmission_event_calls )
+                event_rates.extend( transmission_event_rates )
 
             #---
             # Anagenetic Host Set Evolution: Host Loss
-            host_loss_rate = self.model.symbiont_lineage_host_loss_rate_function(lineage=lineage, simulation_elapsed_time=self.elapsed_time)
+            host_loss_rate = self.model.symbiont_lineage_host_loss_rate_function(symbiont_lineage=lineage, simulation_elapsed_time=self.elapsed_time)
             if host_loss_rate:
                 for host_lineage in lineage.host_iter():
                     event_calls.append( (lineage.remove_host, {"host_lineage": host_lineage}) )
@@ -399,7 +428,7 @@ class InphestSimulator(object):
                         unoccupied_areas[host_lineage].append(area)
                 num_potential_new_area_infection_events += ( len(occupied_areas[host_lineage]) * len(unoccupied_areas[host_lineage]) )
             if num_potential_new_area_infection_events > 0:
-                per_host_area_gain_rate = self.model.symbiont_lineage_area_gain_rate_function(lineage=lineage, simulation_elapsed_time=self.elapsed_time) / num_potential_new_area_infection_events
+                per_host_area_gain_rate = self.model.symbiont_lineage_area_gain_rate_function(symbiont_lineage=lineage, simulation_elapsed_time=self.elapsed_time) / num_potential_new_area_infection_events
                 for host_lineage in lineage.host_iter():
                     for src_area in occupied_areas[host_lineage]:
                         for dest_area in unoccupied_areas[host_lineage]:
@@ -408,7 +437,7 @@ class InphestSimulator(object):
 
             #---
             # Anagenetic Area Set Evolution: Area Loss
-            area_loss_rate = self.model.symbiont_lineage_area_loss_rate_function(lineage=lineage, simulation_elapsed_time=self.elapsed_time)
+            area_loss_rate = self.model.symbiont_lineage_area_loss_rate_function(symbiont_lineage=lineage, simulation_elapsed_time=self.elapsed_time)
             if area_loss_rate:
                 for host_lineage in lineage.host_iter():
                     for area in lineage.areas_in_host_iter():
