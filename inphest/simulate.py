@@ -384,7 +384,6 @@ class InphestSimulator(object):
                     else:
                         uninfected_hosts[area].append( host_lineage )
                     num_potential_new_host_infection_events += ( len(uninfected_hosts[area]) * len(infected_hosts[area]) )
-            sum_of_weights = 0.0
             if num_potential_new_host_infection_events > 0:
                 transmission_event_calls = []
                 transmission_event_rates = []
@@ -396,6 +395,7 @@ class InphestSimulator(object):
                                     from_host_lineage=src_host,
                                     to_host_lineage=dest_host,
                                     area=area,
+                                    num_potential_new_host_infection_events=num_potential_new_host_infection_events,
                                     simulation_elapsed_time=self.elapsed_time)
                             transmission_event_calls.append( (lineage.add_host_in_area,  {"host_lineage": dest_host, "area": area,}) )
                             transmission_event_rates.append(rate)
@@ -419,6 +419,8 @@ class InphestSimulator(object):
             unoccupied_areas = {}
             num_potential_new_area_infection_events = 0
             for host_lineage in lineage.host_iter():
+                if self.debug_mode:
+                    host_lineage.assert_correctly_extant(simulation_elapsed_time=self.elapsed_time)
                 occupied_areas[host_lineage] = []
                 unoccupied_areas[host_lineage] = []
                 for area in host_lineage.current_area_iter():
@@ -427,13 +429,34 @@ class InphestSimulator(object):
                     else:
                         unoccupied_areas[host_lineage].append(area)
                 num_potential_new_area_infection_events += ( len(occupied_areas[host_lineage]) * len(unoccupied_areas[host_lineage]) )
+            # if num_potential_new_area_infection_events > 0:
+            #     per_host_area_gain_rate = self.model.symbiont_lineage_area_gain_rate_function(symbiont_lineage=lineage, simulation_elapsed_time=self.elapsed_time) / num_potential_new_area_infection_events
+            #     for host_lineage in lineage.host_iter():
+            #         for src_area in occupied_areas[host_lineage]:
+            #             for dest_area in unoccupied_areas[host_lineage]:
+            #                 event_calls.append( (lineage.add_host_in_area, {"host_lineage":host_lineage, "area": dest_area,}) )
+            #                 event_rates.append(per_host_area_gain_rate)
             if num_potential_new_area_infection_events > 0:
-                per_host_area_gain_rate = self.model.symbiont_lineage_area_gain_rate_function(symbiont_lineage=lineage, simulation_elapsed_time=self.elapsed_time) / num_potential_new_area_infection_events
+                dispersal_event_calls = []
+                dispersal_event_rates = []
                 for host_lineage in lineage.host_iter():
+                    if self.debug_mode:
+                        host_lineage.assert_correctly_extant(simulation_elapsed_time=self.elapsed_time)
                     for src_area in occupied_areas[host_lineage]:
                         for dest_area in unoccupied_areas[host_lineage]:
-                            event_calls.append( (lineage.add_host_in_area, {"host_lineage":host_lineage, "area": dest_area,}) )
-                            event_rates.append(per_host_area_gain_rate)
+                            rate = self.model.symbiont_lineage_area_gain_rate_function(
+                                    symbiont_lineage=lineage,
+                                    from_area_lineage=src_area,
+                                    to_area_lineage=dest_area,
+                                    host=host_lineage,
+                                    num_potential_new_area_infection_events=num_potential_new_area_infection_events,
+                                    simulation_elapsed_time=self.elapsed_time)
+                            dispersal_event_calls.append( (lineage.add_host_in_area, {"host_lineage":host_lineage, "area": dest_area,}) )
+                            dispersal_event_rates.append(rate)
+                nf = float(sum(dispersal_event_rates))
+                dispersal_event_rates = [tvr / nf for tvr in dispersal_event_rates]
+                event_calls.extend( dispersal_event_calls )
+                event_rates.extend( dispersal_event_rates )
 
             #---
             # Anagenetic Area Set Evolution: Area Loss
@@ -448,6 +471,7 @@ class InphestSimulator(object):
         return event_calls, event_rates
 
     def process_host_event(self, host_event):
+        # print(host_event)
         assert host_event not in self.processed_host_events
         host_lineage = self.host_system.host_lineages_by_id[host_event.lineage_id]
         assert host_lineage.start_time <= self.elapsed_time
