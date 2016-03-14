@@ -35,6 +35,9 @@ def open_output_file_for_csv_writer(filepath, append=False):
         out = open(filepath, "ab" if append else "wb")
     return out
 
+def is_almost_equal(x, y, ndigits=7):
+    return round(x-y, ndigits) == 0
+
 def assert_in_collection(
         items,
         collection,

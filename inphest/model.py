@@ -400,8 +400,12 @@ class HostLineage(object):
         if debug_mode is not None:
             self.debug_mode = debug_mode
         if simulation_elapsed_time is not None:
-            assert simulation_elapsed_time >= self.start_time
-            assert simulation_elapsed_time <= self.end_time
+            try:
+                assert simulation_elapsed_time >= self.start_time
+                assert simulation_elapsed_time <= self.end_time
+            except AssertionError:
+                print("{}, start at {}, end at {}, current time = {}".format(self.lineage_id, self.start_time, self.end_time, simulation_elapsed_time))
+                raise
         assert len(self.host_system.areas) == len(self.start_distribution_bitstring)
         for (area_idx, area), (d_idx, presence) in zip(enumerate(self.host_system.areas), enumerate(self.start_distribution_bitstring)):
             assert area_idx == d_idx
@@ -446,7 +450,7 @@ class HostLineage(object):
 
     def assert_correctly_extant(self, simulation_elapsed_time, ignore_fail=False):
         try:
-            assert simulation_elapsed_time >= self.start_time
+            assert simulation_elapsed_time > self.start_time or utility.is_almost_equal(simulation_elapsed_time, self.start_time)
         except AssertionError:
             message = ("!! PREMATURELY ACTIVE HOST ERROR: {} ({}): times = {} to {}, current simulation elapsed time = {}".format(
                 self.lineage_id,
@@ -459,7 +463,7 @@ class HostLineage(object):
             else:
                 print(message)
         try:
-            assert simulation_elapsed_time <= self.end_time
+            assert simulation_elapsed_time < self.end_time or utility.is_almost_equal(simulation_elapsed_time, self.end_time)
         except AssertionError:
             message = ("!!  EXTINCT HOST ERROR: {} ({}): times = {} to {}, current simulation elapsed time = {}".format(
                     self.lineage_id,

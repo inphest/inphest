@@ -474,8 +474,6 @@ class InphestSimulator(object):
         # print(host_event)
         assert host_event not in self.processed_host_events
         host_lineage = self.host_system.host_lineages_by_id[host_event.lineage_id]
-        assert host_lineage.start_time <= self.elapsed_time
-        assert host_lineage.end_time >= self.elapsed_time
         if self.debug_mode:
             host_lineage.debug_check(simulation_elapsed_time=self.elapsed_time)
         if host_event.event_type == "anagenesis" and host_event.event_subtype == "area_gain":
