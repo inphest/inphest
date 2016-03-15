@@ -1207,17 +1207,18 @@ class InphestModel(object):
 
         ### Anagenetic Host Gain
 
-        if "mean_symbiont_lineage_host_gain_rate" in anagenetic_host_assemblage_evolution_d:
-            self.mean_symbiont_lineage_host_gain_rate = RateFunction.from_definition_dict(anagenetic_host_assemblage_evolution_d.pop("symbiont_lineage_host_gain_rate"))
-        else:
-            self.mean_symbiont_lineage_host_gain_rate = RateFunction(
-                    definition_type="lambda_definition",
-                    definition_content="lambda **kwargs:1.0",
-                    description="fixed: 1.0",
-                    )
+        # if "mean_host_gain_rate" in anagenetic_host_assemblage_evolution_d:
+        #     self.mean_host_gain_rate = RateFunction.from_definition_dict(anagenetic_host_assemblage_evolution_d.pop("mean_host_gain_rate"))
+        # else:
+        #     self.mean_host_gain_rate = RateFunction(
+        #             definition_type="lambda_definition",
+        #             definition_content="lambda **kwargs:1.0",
+        #             description="fixed: 1.0",
+        #             )
+        self.mean_host_gain_rate = anagenetic_host_assemblage_evolution_d.pop("mean_host_gain_rate", 1.0)
         if run_logger is not None:
             run_logger.info("(ANAGENETIC HOST ASSEMBLAGE EVOLUTION) Setting mean host gain rate: {desc}".format(
-                desc=self.mean_symbiont_lineage_host_gain_rate.description,))
+                desc=self.mean_host_gain_rate,))
 
         if "symbiont_lineage_host_gain_rate" in anagenetic_host_assemblage_evolution_d:
             self.symbiont_lineage_host_gain_rate_function = RateFunction.from_definition_dict(anagenetic_host_assemblage_evolution_d.pop("symbiont_lineage_host_gain_rate"))
@@ -1271,6 +1272,11 @@ class InphestModel(object):
         ### Anagenetic Geographical Area Gain
 
         anagenetic_geographical_range_evolution_d = dict(model_definition.pop("anagenetic_geographical_range_evolution", {}))
+        self.mean_area_gain_rate = anagenetic_geographical_range_evolution_d.pop("mean_area_gain_rate", 1.0)
+        if run_logger is not None:
+            run_logger.info("(ANAGENETIC HOST ASSEMBLAGE EVOLUTION) Setting mean area gain rate: {desc}".format(
+                desc=self.mean_host_gain_rate,))
+
         if "lineage_area_gain_rate" in anagenetic_geographical_range_evolution_d:
             self.symbiont_lineage_area_gain_rate_function = RateFunction.from_definition_dict(anagenetic_geographical_range_evolution_d.pop("lineage_area_gain_rate"), self.trait_types)
         else:

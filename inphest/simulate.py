@@ -397,12 +397,14 @@ class InphestSimulator(object):
                                     area=area,
                                     num_potential_new_host_infection_events=num_potential_new_host_infection_events,
                                     simulation_elapsed_time=self.elapsed_time)
-                            transmission_event_calls.append( (lineage.add_host_in_area,  {"host_lineage": dest_host, "area": area,}) )
-                            transmission_event_rates.append(rate)
-                nf = float(sum(transmission_event_rates))
-                transmission_event_rates = [tvr / nf for tvr in transmission_event_rates]
-                event_calls.extend( transmission_event_calls )
-                event_rates.extend( transmission_event_rates )
+                            if rate:
+                                transmission_event_calls.append( (lineage.add_host_in_area,  {"host_lineage": dest_host, "area": area,}) )
+                                transmission_event_rates.append(rate)
+                normalization_factor = float(sum(transmission_event_rates))
+                if normalization_factor:
+                    transmission_event_rates = [self.model.mean_host_gain_rate * (tvr / normalization_factor) for tvr in transmission_event_rates]
+                    event_calls.extend( transmission_event_calls )
+                    event_rates.extend( transmission_event_rates )
 
             #---
             # Anagenetic Host Set Evolution: Host Loss
@@ -451,12 +453,14 @@ class InphestSimulator(object):
                                     host=host_lineage,
                                     num_potential_new_area_infection_events=num_potential_new_area_infection_events,
                                     simulation_elapsed_time=self.elapsed_time)
-                            dispersal_event_calls.append( (lineage.add_host_in_area, {"host_lineage":host_lineage, "area": dest_area,}) )
-                            dispersal_event_rates.append(rate)
-                nf = float(sum(dispersal_event_rates))
-                dispersal_event_rates = [tvr / nf for tvr in dispersal_event_rates]
-                event_calls.extend( dispersal_event_calls )
-                event_rates.extend( dispersal_event_rates )
+                            if rate:
+                                dispersal_event_calls.append( (lineage.add_host_in_area, {"host_lineage":host_lineage, "area": dest_area,}) )
+                                dispersal_event_rates.append(rate)
+                normalization_factor = float(sum(dispersal_event_rates))
+                if normalization_factor:
+                    dispersal_event_rates = [self.model.mean_area_gain_rate * (tvr / normalization_factor) for tvr in dispersal_event_rates]
+                    event_calls.extend( dispersal_event_calls )
+                    event_rates.extend( dispersal_event_rates )
 
             #---
             # Anagenetic Area Set Evolution: Area Loss
