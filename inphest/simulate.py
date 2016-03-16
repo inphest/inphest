@@ -282,6 +282,7 @@ class InphestSimulator(object):
                 event_kwargs = event_calls[event_idx][1]
 
             self.elapsed_time += time_till_event
+            # print("{}: {}({})".format(self.elapsed_time, event_f, event_kwargs))
             if self.model.max_time and self.elapsed_time > self.model.max_time:
                 self.elapsed_time = self.model.max_time
                 assert len(self.processed_host_events) == len(self.host_system.host_history.events)
@@ -323,6 +324,25 @@ class InphestSimulator(object):
         event_calls = []
         event_rates = []
 
+        total_birth_flux = 0.0
+        lineage_birth_event_calls = []
+        lineage_birth_event_weights = []
+        total_death_flux = 0.0
+        lineage_death_event_calls = []
+        lineage_death_event_weights = []
+        total_host_gain_flux = 0.0
+        lineage_host_gain_event_calls = []
+        lineage_host_gain_event_weights = []
+        total_host_loss_flux = 0.0
+        lineage_host_loss_event_calls = []
+        lineage_host_loss_event_weights = []
+        total_area_gain_flux = 0.0
+        lineage_area_gain_event_calls = []
+        lineage_area_gain_event_weights = []
+        total_area_loss_flux = 0.0
+        lineage_area_loss_event_calls = []
+        lineage_area_loss_event_weights = []
+
         # if self.debug_mode:
         #     num_current_lineages = len(self.phylogeny.current_lineages)
         #     self.run_logger.debug("Scheduling events for {} current lineages".format(
@@ -330,46 +350,22 @@ class InphestSimulator(object):
 
         for lineage in self.phylogeny.current_lineage_iter():
 
-            #---
             # Diversification Process: Birth (Speciation)
-            speciation_rate = self.model.symbiont_lineage_birth_rate_function(symbiont_lineage=lineage, simulation_elapsed_time=self.elapsed_time)
-            if speciation_rate:
-                event_calls.append( (self.phylogeny.split_lineage, {"symbiont_lineage": lineage}) )
-                event_rates.append(speciation_rate)
+            total_birth_flux += self.model.mean_symbiont_lineage_diversification_birth_rate
+            birth_weight = self.model.symbiont_lineage_diversification_birth_weight_function(symbiont_lineage=lineage, simulation_elapsed_time=self.elapsed_time)
+            if birth_weight:
+                lineage_birth_event_calls.append( (self.phylogeny.split_lineage, {"symbiont_lineage": lineage}) )
+                lineage_birth_event_weights.append(birth_weight)
 
-            #---
             # Diversification Process: Death (Extinction)
-            extinction_rate = self.model.symbiont_lineage_death_rate_function(symbiont_lineage=lineage, simulation_elapsed_time=self.elapsed_time)
-            if extinction_rate:
-                event_calls.append( (self.phylogeny.extinguish_lineage, {"symbiont_lineage": lineage}) )
-                event_rates.append(extinction_rate)
+            total_death_flux += self.model.mean_symbiont_lineage_diversification_death_rate
+            death_weight = self.model.symbiont_lineage_diversification_death_weight_function(symbiont_lineage=lineage, simulation_elapsed_time=self.elapsed_time)
+            if death_weight:
+                lineage_death_event_calls.append( (self.phylogeny.extinguish_lineage, {"symbiont_lineage": lineage}) )
+                lineage_death_event_weights.append(death_weight)
 
-            #---
-            # Anagenetic Host Set Evolution: Host Gain
-            # ----------------------------------------
-            # Submodel Design Objectives:
-            # 1.    We want to be able to specify that the rate of gaining a
-            #       particular host in a particular area as functions of:
-            #       -   The area (e.g., the number of host lineages in the area; the
-            #           number of symbiont lineages in the area; or the particular
-            #           host or symbiont lineages present/absent from an area).
-            #       -   The source and destination hosts (e.g., the phylogenetic
-            #           distances between the source and destination hosts; the
-            #           number of symbiont lineages in the destination host; etc.)
-            # 2.    We want to be able to specify a mean per-lineage rate of
-            #       transmission. Allows for estimating this from empirical data
-            #       using some reasonable if simplified and low-fidelity model:
-            #       e.g., as a per-lineage trait evolution rate, where the host set
-            #       is a multistate character.
-            # Objective (1) means that the rates must be calculated on a
-            # per-source host per-destination host per area basis.
-            # Objective (2) means that the transmission (host gain) rate
-            # weights across all host gain events needs to sum to 1 (with the
-            # actual rate obtained by multiplying with the system-wide mean
-            # (per-lineage) host gain rate.)
-            # NOTE: this can be optimized! Right now, more a naive
-            # reference implementation of the logic.
-            # NOTE: this needs to be tested.
+            # Anagenetic Host Assemblage Evolution: Host Gain
+            total_host_gain_flux += (self.model.mean_area_gain_rate)
             infected_hosts = {}
             uninfected_hosts = {}
             num_potential_new_host_infection_events = 0
@@ -390,7 +386,7 @@ class InphestSimulator(object):
                 for area in lineage.area_iter():
                     for src_host in infected_hosts[area]:
                         for dest_host in uninfected_hosts[area]:
-                            rate = self.model.symbiont_lineage_host_gain_rate_function(
+                            rate = self.model.symbiont_lineage_host_gain_weight_function(
                                     symbiont_lineage=lineage,
                                     from_host_lineage=src_host,
                                     to_host_lineage=dest_host,
@@ -400,23 +396,20 @@ class InphestSimulator(object):
                             if rate:
                                 transmission_event_calls.append( (lineage.add_host_in_area,  {"host_lineage": dest_host, "area": area,}) )
                                 transmission_event_rates.append(rate)
-                normalization_factor = float(sum(transmission_event_rates))
-                if normalization_factor:
-                    transmission_event_rates = [self.model.mean_host_gain_rate * (tvr / normalization_factor) for tvr in transmission_event_rates]
-                    event_calls.extend( transmission_event_calls )
-                    event_rates.extend( transmission_event_rates )
+                if transmission_event_rates:
+                    lineage_host_gain_event_calls.extend( transmission_event_calls )
+                    lineage_host_gain_event_weights.extend( transmission_event_rates )
 
-            #---
-            # Anagenetic Host Set Evolution: Host Loss
-            host_loss_rate = self.model.symbiont_lineage_host_loss_rate_function(symbiont_lineage=lineage, simulation_elapsed_time=self.elapsed_time)
-            if host_loss_rate:
+            # Anagenetic Host Assemblage Evolution: Host Loss
+            total_host_loss_flux += self.model.mean_host_loss_rate
+            host_loss_weight = self.model.symbiont_lineage_host_loss_weight_function(symbiont_lineage=lineage, simulation_elapsed_time=self.elapsed_time)
+            if host_loss_weight:
                 for host_lineage in lineage.host_iter():
-                    event_calls.append( (lineage.remove_host, {"host_lineage": host_lineage}) )
-                    event_rates.append(host_loss_rate)
+                    lineage_host_loss_event_calls.append( (lineage.remove_host, {"host_lineage": host_lineage}) )
+                    lineage_host_loss_event_weights.append(host_loss_weight)
 
-            #---
-            # Anagenetic Area Set Evolution: Area Gain
-            # (same notes apply as for "Anagenetic Host Set Evolution, Host Gain")
+            # Anagenetic Geographical Evolution: Area Gain
+            total_area_gain_flux += (self.model.mean_area_gain_rate)
             occupied_areas = {}
             unoccupied_areas = {}
             num_potential_new_area_infection_events = 0
@@ -431,13 +424,6 @@ class InphestSimulator(object):
                     else:
                         unoccupied_areas[host_lineage].append(area)
                 num_potential_new_area_infection_events += ( len(occupied_areas[host_lineage]) * len(unoccupied_areas[host_lineage]) )
-            # if num_potential_new_area_infection_events > 0:
-            #     per_host_area_gain_rate = self.model.symbiont_lineage_area_gain_rate_function(symbiont_lineage=lineage, simulation_elapsed_time=self.elapsed_time) / num_potential_new_area_infection_events
-            #     for host_lineage in lineage.host_iter():
-            #         for src_area in occupied_areas[host_lineage]:
-            #             for dest_area in unoccupied_areas[host_lineage]:
-            #                 event_calls.append( (lineage.add_host_in_area, {"host_lineage":host_lineage, "area": dest_area,}) )
-            #                 event_rates.append(per_host_area_gain_rate)
             if num_potential_new_area_infection_events > 0:
                 dispersal_event_calls = []
                 dispersal_event_rates = []
@@ -446,7 +432,7 @@ class InphestSimulator(object):
                         host_lineage.assert_correctly_extant(simulation_elapsed_time=self.elapsed_time)
                     for src_area in occupied_areas[host_lineage]:
                         for dest_area in unoccupied_areas[host_lineage]:
-                            rate = self.model.symbiont_lineage_area_gain_rate_function(
+                            rate = self.model.symbiont_lineage_area_gain_weight_function(
                                     symbiont_lineage=lineage,
                                     from_area_lineage=src_area,
                                     to_area_lineage=dest_area,
@@ -456,22 +442,31 @@ class InphestSimulator(object):
                             if rate:
                                 dispersal_event_calls.append( (lineage.add_host_in_area, {"host_lineage":host_lineage, "area": dest_area,}) )
                                 dispersal_event_rates.append(rate)
-                normalization_factor = float(sum(dispersal_event_rates))
-                if normalization_factor:
-                    dispersal_event_rates = [self.model.mean_area_gain_rate * (tvr / normalization_factor) for tvr in dispersal_event_rates]
-                    event_calls.extend( dispersal_event_calls )
-                    event_rates.extend( dispersal_event_rates )
+                if dispersal_event_rates:
+                    lineage_area_gain_event_calls.extend( dispersal_event_calls )
+                    lineage_area_gain_event_weights.extend( dispersal_event_rates )
 
-            #---
-            # Anagenetic Area Set Evolution: Area Loss
-            area_loss_rate = self.model.symbiont_lineage_area_loss_rate_function(symbiont_lineage=lineage, simulation_elapsed_time=self.elapsed_time)
+            # Anagenetic Geographical Evolution: Area Loss
+            total_area_loss_flux += self.model.mean_area_loss_rate
+            area_loss_rate = self.model.symbiont_lineage_area_loss_weight_function(symbiont_lineage=lineage, simulation_elapsed_time=self.elapsed_time)
             if area_loss_rate:
                 for host_lineage in lineage.host_iter():
-                    for area in lineage.areas_in_host_iter():
-                        event_calls.append( (lineage.remove_host_in_area, {"host_lineage": lineage, "area": area} ))
-                        event_rates.append(area_loss_rate)
+                    for area in lineage.areas_in_host_iter(host_lineage=host_lineage):
+                        lineage_area_loss_event_calls.append( (lineage.remove_host_in_area, {"host_lineage": lineage, "area": area} ))
+                        lineage_area_loss_event_weights.append(area_loss_rate)
 
-        # sum_of_event_rates = sum(event_rates)
+        for subevent_flux, subevent_calls, subevent_weights in (
+                (total_birth_flux, lineage_birth_event_calls, lineage_birth_event_weights),
+                (total_death_flux, lineage_death_event_calls, lineage_death_event_weights),
+                (total_host_gain_flux, lineage_host_gain_event_calls, lineage_host_gain_event_weights),
+                (total_host_loss_flux, lineage_host_loss_event_calls, lineage_host_loss_event_weights),
+                (total_area_gain_flux, lineage_area_gain_event_calls, lineage_area_gain_event_weights),
+                (total_area_loss_flux, lineage_area_loss_event_calls, lineage_area_loss_event_weights),
+                ):
+            normalization_factor = float(sum(subevent_weights))
+            subevent_rates = [ subevent_flux * (w/normalization_factor) for w in subevent_weights ]
+            event_calls.extend( subevent_calls )
+            event_rates.extend( subevent_rates )
         return event_calls, event_rates
 
     def process_host_event(self, host_event):

@@ -952,9 +952,9 @@ class SymbiontPhylogeny(dendropy.Tree):
     def _make_lineage_extinct_on_phylogeny(self, symbiont_lineage):
         if len(self.current_lineages) == 1:
             self.total_extinction_exception("no extant lineages remaining")
-        lineage.is_extant = False
-        self.current_lineages.remove(lineage)
-        self.prune_subtree(lineage)
+        symbiont_lineage.is_extant = False
+        self.current_lineages.remove(symbiont_lineage)
+        self.prune_subtree(symbiont_lineage)
 
     def total_extinction_exception(self, msg):
         # self.run_logger.info("Total extinction: {}".format(msg))
@@ -1169,89 +1169,84 @@ class InphestModel(object):
         self.host_history = host_history
 
         # Diversification
+        diversification_d = dict(model_definition.pop("diversification", {}))
 
         ## speciation
-        diversification_d = dict(model_definition.pop("diversification", {}))
-        if "symbiont_lineage_birth_rate" in diversification_d:
-            self.symbiont_lineage_birth_rate_function = RateFunction.from_definition_dict(diversification_d.pop("symbiont_lineage_birth_rate"))
+        self.mean_symbiont_lineage_diversification_birth_rate = diversification_d.pop("mean_symbiont_lineage_diversification_birth_rate", 0.05)
+        if run_logger is not None:
+            run_logger.info("(DIVERSIFICATION) Mean symbiont lineage diversification birth rate: {}".format(self.mean_symbiont_lineage_diversification_birth_rate))
+        if "symbiont_lineage_diversification_birth_weight" in diversification_d:
+            self.symbiont_lineage_diversification_birth_weight_function = RateFunction.from_definition_dict(diversification_d.pop("symbiont_lineage_diversification_birth_weight"))
         else:
-            self.symbiont_lineage_birth_rate_function = RateFunction(
+            self.symbiont_lineage_diversification_birth_weight_function = RateFunction(
                     definition_type="lambda_definition",
-                    definition_content="lambda **kwargs: 0.04",
-                    description="fixed: 0.04",
+                    definition_content="lambda **kwargs: 1.00",
+                    description="fixed: 1.00",
                     )
         if run_logger is not None:
-            run_logger.info("(DIVERSIFICATION) Setting symbiont lineage-specific birth rate function: {desc}".format(
-                desc=self.symbiont_lineage_birth_rate_function.description,))
+            run_logger.info("(DIVERSIFICATION) Setting symbiont lineage-specific birth weight function: {desc}".format(
+                desc=self.symbiont_lineage_diversification_birth_weight_function.description,))
 
         ## extinction
-        if "symbiont_lineage_death_rate" in diversification_d:
-            self.symbiont_lineage_death_rate_function = RateFunction.from_definition_dict(diversification_d.pop("symbiont_lineage_death_rate"))
+        self.mean_symbiont_lineage_diversification_death_rate = diversification_d.pop("mean_symbiont_lineage_diversification_death_rate", 0.00)
+        if run_logger is not None:
+            run_logger.info("(DIVERSIFICATION) Mean symbiont lineage diversification death rate: {}".format(self.mean_symbiont_lineage_diversification_death_rate))
+        if "symbiont_lineage_diversification_death_weight" in diversification_d:
+            self.symbiont_lineage_diversification_death_weight_function = RateFunction.from_definition_dict(diversification_d.pop("symbiont_lineage_diversification_death_weight"))
         else:
-            self.symbiont_lineage_death_rate_function = RateFunction(
+            self.symbiont_lineage_diversification_death_weight_function = RateFunction(
                     definition_type="lambda_definition",
-                    definition_content="lambda **kwargs: 0.0",
-                    description="fixed: 0.0",
+                    definition_content="lambda **kwargs: 1.00",
+                    description="fixed: 1.00",
                     )
         if run_logger is not None:
-            run_logger.info("(DIVERSIFICATION) Setting symbiont lineage-specific death rate function: {desc}".format(
-                desc=self.symbiont_lineage_death_rate_function.description,))
-        if diversification_d:
-            raise TypeError("Unsupported diversification model keywords: {}".format(diversification_d))
+            run_logger.info("(DIVERSIFICATION) Setting symbiont lineage-specific death weight function: {desc}".format(
+                desc=self.symbiont_lineage_diversification_death_weight_function.description,))
 
         # Host Submodel
 
         ## Anagenetic Host Evolution Submodel
-
         anagenetic_host_assemblage_evolution_d = dict(model_definition.pop("anagenetic_host_assemblage_evolution", {}))
 
         ### Anagenetic Host Gain
-
-        # if "mean_host_gain_rate" in anagenetic_host_assemblage_evolution_d:
-        #     self.mean_host_gain_rate = RateFunction.from_definition_dict(anagenetic_host_assemblage_evolution_d.pop("mean_host_gain_rate"))
-        # else:
-        #     self.mean_host_gain_rate = RateFunction(
-        #             definition_type="lambda_definition",
-        #             definition_content="lambda **kwargs:1.0",
-        #             description="fixed: 1.0",
-        #             )
-        self.mean_host_gain_rate = anagenetic_host_assemblage_evolution_d.pop("mean_host_gain_rate", 1.0)
+        self.mean_host_gain_rate = anagenetic_host_assemblage_evolution_d.pop("mean_host_gain_rate", 0.05)
         if run_logger is not None:
             run_logger.info("(ANAGENETIC HOST ASSEMBLAGE EVOLUTION) Setting mean host gain rate: {desc}".format(
                 desc=self.mean_host_gain_rate,))
-
         if "symbiont_lineage_host_gain_rate" in anagenetic_host_assemblage_evolution_d:
-            self.symbiont_lineage_host_gain_rate_function = RateFunction.from_definition_dict(anagenetic_host_assemblage_evolution_d.pop("symbiont_lineage_host_gain_rate"))
+            self.symbiont_lineage_host_gain_weight_function = RateFunction.from_definition_dict(anagenetic_host_assemblage_evolution_d.pop("symbiont_lineage_host_gain_rate"))
         else:
-            self.symbiont_lineage_host_gain_rate_function = RateFunction(
+            self.symbiont_lineage_host_gain_weight_function = RateFunction(
                     definition_type="lambda_definition",
-                    definition_content="lambda **kwargs: 0.04",
-                    description="fixed: 0.04",
+                    definition_content="lambda **kwargs: 1.00",
+                    description="fixed: 1.00",
                     )
         if run_logger is not None:
             run_logger.info("(ANAGENETIC HOST ASSEMBLAGE EVOLUTION) Setting symbiont lineage-specific host gain weight function: {desc}".format(
-                desc=self.symbiont_lineage_host_gain_rate_function.description,))
+                desc=self.symbiont_lineage_host_gain_weight_function.description,))
 
         ### Anagenetic Host Loss
-
+        self.mean_host_loss_rate = anagenetic_host_assemblage_evolution_d.pop("mean_host_loss_rate", 0.00)
+        if run_logger is not None:
+            run_logger.info("(ANAGENETIC HOST ASSEMBLAGE EVOLUTION) Setting mean host loss rate: {desc}".format(
+                desc=self.mean_host_loss_rate,))
         if "symbiont_lineage_host_loss_rate" in anagenetic_host_assemblage_evolution_d:
-            self.symbiont_lineage_host_loss_rate_function = RateFunction.from_definition_dict(anagenetic_host_assemblage_evolution_d.pop("symbiont_lineage_host_loss_rate"))
+            self.symbiont_lineage_host_loss_weight_function = RateFunction.from_definition_dict(anagenetic_host_assemblage_evolution_d.pop("symbiont_lineage_host_loss_rate"))
         else:
-            self.symbiont_lineage_host_loss_rate_function = RateFunction(
+            self.symbiont_lineage_host_loss_weight_function = RateFunction(
                     definition_type="lambda_definition",
-                    definition_content="lambda **kwargs: 0.0",
-                    description="fixed: 0.0",
+                    definition_content="lambda **kwargs: 1.0",
+                    description="fixed: 1.0",
                     )
         if run_logger is not None:
             run_logger.info("(ANAGENETIC HOST ASSEMBLAGE EVOLUTION) Setting symbiont lineage-specific host loss weight function: {desc}".format(
-                desc=self.symbiont_lineage_host_loss_rate_function.description,
+                desc=self.symbiont_lineage_host_loss_weight_function.description,
                 ))
 
         if anagenetic_host_assemblage_evolution_d:
             raise TypeError("Unsupported keywords in anagenetic host range evolution submodel: {}".format(anagenetic_host_assemblage_evolution_d))
 
         ## Cladogenetic Host Evolution Submodel
-
         cladogenetic_host_assemblage_evolution = dict(model_definition.pop("cladogenetic_host_assemblage_evolution", {}))
         self.host_cladogenesis_sympatric_subset_speciation_weight = float(cladogenetic_host_assemblage_evolution.pop("sympatric_subset_speciation_weight", 1.0))
         self.host_cladogenesis_single_host_vicariance_speciation_weight = float(cladogenetic_host_assemblage_evolution.pop("single_host_vicariance_speciation_weight", 1.0))
@@ -1272,36 +1267,39 @@ class InphestModel(object):
         ### Anagenetic Geographical Area Gain
 
         anagenetic_geographical_range_evolution_d = dict(model_definition.pop("anagenetic_geographical_range_evolution", {}))
-        self.mean_area_gain_rate = anagenetic_geographical_range_evolution_d.pop("mean_area_gain_rate", 1.0)
+        self.mean_area_gain_rate = anagenetic_geographical_range_evolution_d.pop("mean_area_gain_rate", 0.05)
         if run_logger is not None:
             run_logger.info("(ANAGENETIC HOST ASSEMBLAGE EVOLUTION) Setting mean area gain rate: {desc}".format(
                 desc=self.mean_host_gain_rate,))
-
         if "lineage_area_gain_rate" in anagenetic_geographical_range_evolution_d:
-            self.symbiont_lineage_area_gain_rate_function = RateFunction.from_definition_dict(anagenetic_geographical_range_evolution_d.pop("lineage_area_gain_rate"), self.trait_types)
+            self.symbiont_lineage_area_gain_weight_function = RateFunction.from_definition_dict(anagenetic_geographical_range_evolution_d.pop("lineage_area_gain_rate"), self.trait_types)
         else:
-            self.symbiont_lineage_area_gain_rate_function = RateFunction(
+            self.symbiont_lineage_area_gain_weight_function = RateFunction(
                     definition_type="lambda_definition",
-                    definition_content="lambda **kwargs: 0.01",
-                    description="fixed: 0.01",
+                    definition_content="lambda **kwargs: 1.00",
+                    description="fixed: 1.00",
                     )
         if run_logger is not None:
             run_logger.info("(ANAGENETIC GEOGRAPHICAL RANGE EVOLUTION) Setting symbiont lineage-specific area gain weight function: {desc}".format(
-                desc=self.symbiont_lineage_area_gain_rate_function.description,))
+                desc=self.symbiont_lineage_area_gain_weight_function.description,))
 
-        ### Anagenetic Geographical Area Gain
-
+        ### Anagenetic Geographical Area Loss
+        anagenetic_geographical_range_evolution_d = dict(model_definition.pop("anagenetic_geographical_range_evolution", {}))
+        self.mean_area_loss_rate = anagenetic_geographical_range_evolution_d.pop("mean_area_loss_rate", 0.0)
+        if run_logger is not None:
+            run_logger.info("(ANAGENETIC HOST ASSEMBLAGE EVOLUTION) Setting mean area loss rate: {desc}".format(
+                desc=self.mean_host_loss_rate,))
         if "lineage_area_loss_rate" in anagenetic_geographical_range_evolution_d:
-            self.symbiont_lineage_area_loss_rate_function = RateFunction.from_definition_dict(anagenetic_geographical_range_evolution_d.pop("lineage_area_loss_rate"), self.trait_types)
+            self.symbiont_lineage_area_loss_weight_function = RateFunction.from_definition_dict(anagenetic_geographical_range_evolution_d.pop("lineage_area_loss_rate"), self.trait_types)
         else:
-            self.symbiont_lineage_area_loss_rate_function = RateFunction(
+            self.symbiont_lineage_area_loss_weight_function = RateFunction(
                     definition_type="lambda_definition",
-                    definition_content="lambda **kwargs: 0.0",
-                    description="fixed: 0.0",
+                    definition_content="lambda **kwargs: 1.0",
+                    description="fixed: 1.0",
                     )
         if run_logger is not None:
             run_logger.info("(ANAGENETIC GEOGRAPHICAL RANGE EVOLUTION) Setting symbiont lineage-specific area loss weight function: {desc}".format(
-                desc=self.symbiont_lineage_area_loss_rate_function.description,
+                desc=self.symbiont_lineage_area_loss_weight_function.description,
                 ))
 
         if anagenetic_geographical_range_evolution_d:
@@ -1367,8 +1365,8 @@ class InphestModel(object):
 
     def diversification_as_definition(self):
         d = collections.OrderedDict()
-        d["lineage_birth_rate"] = self.lineage_birth_rate_function.as_definition()
-        d["lineage_death_rate"] = self.lineage_death_rate_function.as_definition()
+        d["lineage_birth_rate"] = self.lineage_birth_weight_function.as_definition()
+        d["lineage_death_rate"] = self.lineage_death_weight_function.as_definition()
         return d
 
     def anagenetic_range_evolution_as_definition(self):
@@ -1381,8 +1379,8 @@ class InphestModel(object):
         #     d["global_area_gain_rate"] = self.global_area_gain_rate
         # else:
         #     d["mean_area_gain_rate"] = self.mean_area_gain_rate
-        d["lineage_area_gain_rate"] = self.lineage_area_gain_rate_function.as_definition()
-        d["lineage_area_loss_rate"] = self.lineage_area_loss_rate_function.as_definition()
+        d["lineage_area_gain_rate"] = self.lineage_area_gain_weight_function.as_definition()
+        d["lineage_area_loss_rate"] = self.lineage_area_loss_weight_function.as_definition()
         return d
 
     def cladogenetic_range_evolution_as_definition(self):
