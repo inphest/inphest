@@ -321,27 +321,32 @@ class InphestSimulator(object):
             #     break
 
     def schedule_events(self):
-        event_calls = []
-        event_rates = []
+        event_fluxes = {}
+        event_calls = {}
+        event_weights = {}
+        for event_type in ("birth", "death", "host_gain", "host_loss", "area_gain", "area_loss"):
+            event_fluxes[event_type] = 0.0
+            event_calls[event_type] = []
+            event_weights[event_type] = []
 
-        total_birth_flux = 0.0
-        lineage_birth_event_calls = []
-        lineage_birth_event_weights = []
-        total_death_flux = 0.0
-        lineage_death_event_calls = []
-        lineage_death_event_weights = []
-        total_host_gain_flux = 0.0
-        lineage_host_gain_event_calls = []
-        lineage_host_gain_event_weights = []
-        total_host_loss_flux = 0.0
-        lineage_host_loss_event_calls = []
-        lineage_host_loss_event_weights = []
-        total_area_gain_flux = 0.0
-        lineage_area_gain_event_calls = []
-        lineage_area_gain_event_weights = []
-        total_area_loss_flux = 0.0
-        lineage_area_loss_event_calls = []
-        lineage_area_loss_event_weights = []
+        # total_birth_flux = 0.0
+        # lineage_birth_event_calls = []
+        # lineage_birth_event_weights = []
+        # total_death_flux = 0.0
+        # lineage_death_event_calls = []
+        # lineage_death_event_weights = []
+        # total_host_gain_flux = 0.0
+        # lineage_host_gain_event_calls = []
+        # lineage_host_gain_event_weights = []
+        # total_host_loss_flux = 0.0
+        # lineage_host_loss_event_calls = []
+        # lineage_host_loss_event_weights = []
+        # total_area_gain_flux = 0.0
+        # lineage_area_gain_event_calls = []
+        # lineage_area_gain_event_weights = []
+        # total_area_loss_flux = 0.0
+        # lineage_area_loss_event_calls = []
+        # lineage_area_loss_event_weights = []
 
         # if self.debug_mode:
         #     num_current_lineages = len(self.phylogeny.current_lineages)
@@ -351,21 +356,21 @@ class InphestSimulator(object):
         for lineage in self.phylogeny.current_lineage_iter():
 
             # Diversification Process: Birth (Speciation)
-            total_birth_flux += self.model.mean_symbiont_lineage_diversification_birth_rate
+            event_fluxes["birth"] += self.model.mean_symbiont_lineage_diversification_birth_rate
             birth_weight = self.model.symbiont_lineage_diversification_birth_weight_function(symbiont_lineage=lineage, simulation_elapsed_time=self.elapsed_time)
             if birth_weight:
-                lineage_birth_event_calls.append( (self.phylogeny.split_lineage, {"symbiont_lineage": lineage}) )
-                lineage_birth_event_weights.append(birth_weight)
+                event_calls["birth"].append( (self.phylogeny.split_lineage, {"symbiont_lineage": lineage}) )
+                event_weights["birth"].append(birth_weight)
 
             # Diversification Process: Death (Extinction)
-            total_death_flux += self.model.mean_symbiont_lineage_diversification_death_rate
+            event_fluxes["death"] += self.model.mean_symbiont_lineage_diversification_death_rate
             death_weight = self.model.symbiont_lineage_diversification_death_weight_function(symbiont_lineage=lineage, simulation_elapsed_time=self.elapsed_time)
             if death_weight:
-                lineage_death_event_calls.append( (self.phylogeny.extinguish_lineage, {"symbiont_lineage": lineage}) )
-                lineage_death_event_weights.append(death_weight)
+                event_calls["death"].append( (self.phylogeny.extinguish_lineage, {"symbiont_lineage": lineage}) )
+                event_weights["death"].append(death_weight)
 
             # Anagenetic Host Assemblage Evolution: Host Gain
-            total_host_gain_flux += (self.model.mean_area_gain_rate)
+            event_fluxes["host_gain"] += (self.model.mean_area_gain_rate)
             infected_hosts = {}
             uninfected_hosts = {}
             num_potential_new_host_infection_events = 0
@@ -397,19 +402,19 @@ class InphestSimulator(object):
                                 transmission_event_calls.append( (lineage.add_host_in_area,  {"host_lineage": dest_host, "area": area,}) )
                                 transmission_event_rates.append(rate)
                 if transmission_event_rates:
-                    lineage_host_gain_event_calls.extend( transmission_event_calls )
-                    lineage_host_gain_event_weights.extend( transmission_event_rates )
+                    event_calls["host_gain"].extend( transmission_event_calls )
+                    event_weights["host_gain"].extend( transmission_event_rates )
 
             # Anagenetic Host Assemblage Evolution: Host Loss
-            total_host_loss_flux += self.model.mean_host_loss_rate
+            event_fluxes["host_loss"] += self.model.mean_host_loss_rate
             host_loss_weight = self.model.symbiont_lineage_host_loss_weight_function(symbiont_lineage=lineage, simulation_elapsed_time=self.elapsed_time)
             if host_loss_weight:
                 for host_lineage in lineage.host_iter():
-                    lineage_host_loss_event_calls.append( (lineage.remove_host, {"host_lineage": host_lineage}) )
-                    lineage_host_loss_event_weights.append(host_loss_weight)
+                    event_calls["host_loss"].append( (lineage.remove_host, {"host_lineage": host_lineage}) )
+                    event_weights["host_loss"].append(host_loss_weight)
 
             # Anagenetic Geographical Evolution: Area Gain
-            total_area_gain_flux += (self.model.mean_area_gain_rate)
+            event_fluxes["area_gain"] += (self.model.mean_area_gain_rate)
             occupied_areas = {}
             unoccupied_areas = {}
             num_potential_new_area_infection_events = 0
@@ -443,31 +448,36 @@ class InphestSimulator(object):
                                 dispersal_event_calls.append( (lineage.add_host_in_area, {"host_lineage":host_lineage, "area": dest_area,}) )
                                 dispersal_event_rates.append(rate)
                 if dispersal_event_rates:
-                    lineage_area_gain_event_calls.extend( dispersal_event_calls )
-                    lineage_area_gain_event_weights.extend( dispersal_event_rates )
+                    event_calls["area_gain"].extend( dispersal_event_calls )
+                    event_weights["area_gain"].extend( dispersal_event_rates )
 
             # Anagenetic Geographical Evolution: Area Loss
-            total_area_loss_flux += self.model.mean_area_loss_rate
+            event_fluxes["area_loss"] += self.model.mean_area_loss_rate
             area_loss_rate = self.model.symbiont_lineage_area_loss_weight_function(symbiont_lineage=lineage, simulation_elapsed_time=self.elapsed_time)
             if area_loss_rate:
                 for host_lineage in lineage.host_iter():
                     for area in lineage.areas_in_host_iter(host_lineage=host_lineage):
-                        lineage_area_loss_event_calls.append( (lineage.remove_host_in_area, {"host_lineage": lineage, "area": area} ))
-                        lineage_area_loss_event_weights.append(area_loss_rate)
+                        event_calls["area_loss"].append( (lineage.remove_host_in_area, {"host_lineage": lineage, "area": area} ))
+                        event_weights["area_loss"].append(area_loss_rate)
 
-        for subevent_flux, subevent_calls, subevent_weights in (
-                (total_birth_flux, lineage_birth_event_calls, lineage_birth_event_weights),
-                (total_death_flux, lineage_death_event_calls, lineage_death_event_weights),
-                (total_host_gain_flux, lineage_host_gain_event_calls, lineage_host_gain_event_weights),
-                (total_host_loss_flux, lineage_host_loss_event_calls, lineage_host_loss_event_weights),
-                (total_area_gain_flux, lineage_area_gain_event_calls, lineage_area_gain_event_weights),
-                (total_area_loss_flux, lineage_area_loss_event_calls, lineage_area_loss_event_weights),
-                ):
+        master_event_calls = []
+        master_event_rates = []
+        # for subevent_flux, subevent_calls, subevent_weights in (
+        #         (total_birth_flux, lineage_birth_event_calls, lineage_birth_event_weights),
+        #         (total_death_flux, lineage_death_event_calls, lineage_death_event_weights),
+        #         (total_host_gain_flux, lineage_host_gain_event_calls, lineage_host_gain_event_weights),
+        #         (total_host_loss_flux, lineage_host_loss_event_calls, lineage_host_loss_event_weights),
+        #         (total_area_gain_flux, lineage_area_gain_event_calls, lineage_area_gain_event_weights),
+        #         (total_area_loss_flux, lineage_area_loss_event_calls, lineage_area_loss_event_weights),
+        #         ):
+        for event_type in event_fluxes:
+            subevent_flux = event_fluxes[event_type]
+            subevent_weights = event_weights[event_type]
             normalization_factor = float(sum(subevent_weights))
             subevent_rates = [ subevent_flux * (w/normalization_factor) for w in subevent_weights ]
-            event_calls.extend( subevent_calls )
-            event_rates.extend( subevent_rates )
-        return event_calls, event_rates
+            master_event_calls.extend( event_calls[event_type] )
+            master_event_rates.extend( subevent_rates )
+        return master_event_calls, master_event_rates
 
     def process_host_event(self, host_event):
         # print(host_event)
