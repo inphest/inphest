@@ -407,11 +407,15 @@ class InphestSimulator(object):
 
             # Anagenetic Host Assemblage Evolution: Host Loss
             event_fluxes["host_loss"] += self.model.mean_host_loss_rate
-            host_loss_weight = self.model.symbiont_lineage_host_loss_weight_function(symbiont_lineage=lineage, simulation_elapsed_time=self.elapsed_time)
-            if host_loss_weight:
-                for host_lineage in lineage.host_iter():
-                    event_calls["host_loss"].append( (lineage.remove_host, {"host_lineage": host_lineage}) )
-                    event_weights["host_loss"].append(host_loss_weight)
+            for host_lineage in lineage.host_iter():
+                host_loss_weight = self.model.symbiont_lineage_host_loss_weight_function(
+                        symbiont_lineage=lineage,
+                        host_lineage=host_lineage,
+                        simulation_elapsed_time=self.elapsed_time)
+                if host_loss_weight:
+                    for host_lineage in lineage.host_iter():
+                        event_calls["host_loss"].append( (lineage.remove_host, {"host_lineage": host_lineage}) )
+                        event_weights["host_loss"].append(host_loss_weight)
 
             # Anagenetic Geographical Evolution: Area Gain
             event_fluxes["area_gain"] += (self.model.mean_area_gain_rate)
@@ -453,12 +457,18 @@ class InphestSimulator(object):
 
             # Anagenetic Geographical Evolution: Area Loss
             event_fluxes["area_loss"] += self.model.mean_area_loss_rate
-            area_loss_rate = self.model.symbiont_lineage_area_loss_weight_function(symbiont_lineage=lineage, simulation_elapsed_time=self.elapsed_time)
-            if area_loss_rate:
-                for host_lineage in lineage.host_iter():
-                    for area in lineage.areas_in_host_iter(host_lineage=host_lineage):
-                        event_calls["area_loss"].append( (lineage.remove_host_in_area, {"host_lineage": lineage, "area": area} ))
-                        event_weights["area_loss"].append(area_loss_rate)
+            for host_lineage in lineage.host_iter():
+                for area in lineage.areas_in_host_iter(host_lineage):
+                    area_loss_rate = self.model.symbiont_lineage_area_loss_weight_function(
+                            symbiont_lineage=lineage,
+                            host_lineage=host_lineage,
+                            area=area,
+                            simulation_elapsed_time=self.elapsed_time)
+                    if area_loss_rate:
+                        for host_lineage in lineage.host_iter():
+                            for area in lineage.areas_in_host_iter(host_lineage=host_lineage):
+                                event_calls["area_loss"].append( (lineage.remove_host_in_area, {"host_lineage": lineage, "area": area} ))
+                                event_weights["area_loss"].append(area_loss_rate)
 
         master_event_calls = []
         master_event_rates = []
