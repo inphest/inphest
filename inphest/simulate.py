@@ -419,8 +419,8 @@ class InphestSimulator(object):
                         for dest_area in unoccupied_areas[host_lineage]:
                             rate = self.model.symbiont_lineage_area_gain_weight_function(
                                     symbiont_lineage=lineage,
-                                    from_area_lineage=src_area,
-                                    to_area_lineage=dest_area,
+                                    from_area=src_area,
+                                    to_area=dest_area,
                                     host=host_lineage,
                                     num_potential_new_area_infection_events=num_potential_new_area_infection_events,
                                     simulation_elapsed_time=self.elapsed_time)
