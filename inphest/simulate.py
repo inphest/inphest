@@ -329,30 +329,6 @@ class InphestSimulator(object):
             event_calls[event_type] = []
             event_weights[event_type] = []
 
-        # total_birth_flux = 0.0
-        # lineage_birth_event_calls = []
-        # lineage_birth_event_weights = []
-        # total_death_flux = 0.0
-        # lineage_death_event_calls = []
-        # lineage_death_event_weights = []
-        # total_host_gain_flux = 0.0
-        # lineage_host_gain_event_calls = []
-        # lineage_host_gain_event_weights = []
-        # total_host_loss_flux = 0.0
-        # lineage_host_loss_event_calls = []
-        # lineage_host_loss_event_weights = []
-        # total_area_gain_flux = 0.0
-        # lineage_area_gain_event_calls = []
-        # lineage_area_gain_event_weights = []
-        # total_area_loss_flux = 0.0
-        # lineage_area_loss_event_calls = []
-        # lineage_area_loss_event_weights = []
-
-        # if self.debug_mode:
-        #     num_current_lineages = len(self.phylogeny.current_lineages)
-        #     self.run_logger.debug("Scheduling events for {} current lineages".format(
-        #         num_current_lineages))
-
         for lineage in self.phylogeny.current_lineage_iter():
 
             # Diversification Process: Birth (Speciation)
@@ -472,14 +448,6 @@ class InphestSimulator(object):
 
         master_event_calls = []
         master_event_rates = []
-        # for subevent_flux, subevent_calls, subevent_weights in (
-        #         (total_birth_flux, lineage_birth_event_calls, lineage_birth_event_weights),
-        #         (total_death_flux, lineage_death_event_calls, lineage_death_event_weights),
-        #         (total_host_gain_flux, lineage_host_gain_event_calls, lineage_host_gain_event_weights),
-        #         (total_host_loss_flux, lineage_host_loss_event_calls, lineage_host_loss_event_weights),
-        #         (total_area_gain_flux, lineage_area_gain_event_calls, lineage_area_gain_event_weights),
-        #         (total_area_loss_flux, lineage_area_loss_event_calls, lineage_area_loss_event_weights),
-        #         ):
         for event_type in event_fluxes:
             subevent_flux = event_fluxes[event_type]
             subevent_weights = event_weights[event_type]
