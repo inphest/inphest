@@ -60,7 +60,10 @@ class InphestSimulator(object):
         self.model = inphest_model
 
         # initialize host system
-        self.host_system = model.HostSystem(host_history=self.model.host_history, run_logger=self.run_logger,)
+        self.host_system = model.HostSystem(
+                host_history=self.model.host_history,
+                host_to_symbiont_time_scale_factor=self.model.host_to_symbiont_time_scale_factor,
+                run_logger=self.run_logger,)
 
         # track host events
         self.next_host_event = None
@@ -76,6 +79,9 @@ class InphestSimulator(object):
                 debug_mode=self.debug_mode,
                 run_logger=self.run_logger,
                 )
+
+        # set run times
+        self.max_time = self.host_system.end_time
 
         # begin logging generations
         self.run_logger.system = self
@@ -189,20 +195,8 @@ class InphestSimulator(object):
         self.elapsed_time = 0.0
 
         ### Initialize logging
-        ### None: default logging, 0: no logging
-        # if self.log_frequency is None:
-        #     if self.model.target_focal_area_lineages:
-        #         default_log_frequency = 1
-        #     else:
-        #         default_log_frequency = self.model.max_time/100
-        # if self.log_frequency:
-        #     if self.model.target_focal_area_lineages:
-        #         last_logged_num_tips = 0
-        #     else:
-        #         last_logged_time = 0.0
-
         if self.log_frequency is None:
-            default_log_frequency = self.model.max_time/100
+            default_log_frequency = self.max_time/100
         if self.log_frequency:
             last_logged_time = 0.0
 
@@ -283,8 +277,8 @@ class InphestSimulator(object):
 
             self.elapsed_time += time_till_event
             # print("{}: {}({})".format(self.elapsed_time, event_f, event_kwargs))
-            if self.model.max_time and self.elapsed_time > self.model.max_time:
-                self.elapsed_time = self.model.max_time
+            if self.max_time and self.elapsed_time > self.max_time:
+                self.elapsed_time = self.max_time
                 assert len(self.processed_host_events) == len(self.host_system.host_history.events)
                 assert len(self.host_system.host_events) == 0
                 self.run_logger.info("Termination condition of t = {} reached: storing results and terminating".format(self.elapsed_time))
@@ -707,7 +701,8 @@ def repeat_run(
                 inphest_simulator = InphestSimulator(
                     inphest_model=inphest_model,
                     config_d=config_d,
-                    is_verbose_setup=is_verbose_setup)
+                    is_verbose_setup=is_verbose_setup,
+                    )
                 try:
                     inphest_simulator.run()
                     run_logger.system = None

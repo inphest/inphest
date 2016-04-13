@@ -380,13 +380,14 @@ class HostLineage(object):
             debug_mode):
         self.host_history_lineage_definition = host_history_lineage_definition
         self.host_system = host_system
+        self.host_to_symbiont_time_scale_factor = host_system.host_to_symbiont_time_scale_factor
         self.lineage_id = host_history_lineage_definition.lineage_id
         self.lineage_parent_id = host_history_lineage_definition.lineage_parent_id
         self.leafset_bitstring = host_history_lineage_definition.leafset_bitstring
         self.split_bitstring = host_history_lineage_definition.split_bitstring
         self.rb_index = host_history_lineage_definition.rb_index
-        self.start_time = host_history_lineage_definition.lineage_start_time
-        self.end_time = host_history_lineage_definition.lineage_end_time
+        self.start_time = host_history_lineage_definition.lineage_start_time * self.host_to_symbiont_time_scale_factor
+        self.end_time = host_history_lineage_definition.lineage_end_time * self.host_to_symbiont_time_scale_factor
         self.start_distribution_bitstring = host_history_lineage_definition.lineage_start_distribution_bitstring
         self.end_distribution_bitstring = host_history_lineage_definition.lineage_end_distribution_bitstring
         self.is_seed_node = host_history_lineage_definition.is_seed_node
@@ -563,20 +564,21 @@ class HostSystem(object):
 
     def __init__(self,
             host_history,
+            host_to_symbiont_time_scale_factor=1.0,
+            debug_mode=False,
             run_logger=None):
-        self.compile(host_history)
-        # if self.debug_mode:
-        #     ## setup for checking initial distributions ##
-        #     self.check_lineage_distributions = {}
-        #     for host_lineage in self.host_lineages:
-        #         self.check_lineage_distributions[host_lineage] = list(host_lineage.start_distribution_bitstring)
-        #         self.debug_check_initial_distribution(host_lineage)
+        self.compile(
+                host_history=host_history,
+                host_to_symbiont_time_scale_factor=host_to_symbiont_time_scale_factor,
+                debug_mode=debug_mode,
+                )
         self._next_host_event = None
 
-    def compile(self, host_history, debug_mode=False):
+    def compile(self, host_history, host_to_symbiont_time_scale_factor, debug_mode=False):
         self.host_history = host_history
-        self.start_time = self.host_history.start_time
-        self.end_time = self.host_history.end_time
+        self.host_to_symbiont_time_scale_factor = host_to_symbiont_time_scale_factor
+        self.start_time = self.host_history.start_time * self.host_to_symbiont_time_scale_factor
+        self.end_time = self.host_history.end_time * self.host_to_symbiont_time_scale_factor
         num_areas = None
 
         # build areas
@@ -617,7 +619,20 @@ class HostSystem(object):
                 self.leaf_host_lineages.add(host)
 
         # local copy of host events
-        self.host_events = list(self.host_history.events)
+        # self.host_events = list(self.host_history.events)
+        self.host_events = []
+        for event in self.host_history.events:
+            event_copy = HostHistory.HostEvent(
+                event_time=event.event_time * self.host_to_symbiont_time_scale_factor,
+                weight=event.weight,
+                lineage_id=event.lineage_id,
+                event_type=event.event_type,
+                event_subtype=event.event_subtype,
+                area_idx=event.area_idx,
+                child0_lineage_id=event.child0_lineage_id,
+                child1_lineage_id=event.child1_lineage_id,
+                )
+            self.host_events.append(event_copy)
 
     def extant_host_lineages_at_current_time(self, current_time):
         ## TODO: if we hit this often, we need to construct a look-up table
@@ -1168,6 +1183,11 @@ class InphestModel(object):
         # host regime
         self.host_history = host_history
 
+        # timing
+        self.host_to_symbiont_time_scale_factor = float(model_definition.pop("host_to_symbiont_time_scale_factor", 1.00))
+        if run_logger is not None:
+            run_logger.info("(TIME SCALE) Setting time scale: 1 unit of host time is equal to {} unit(s) of symbiont time".format(self.host_to_symbiont_time_scale_factor))
+
         # Diversification
         diversification_d = dict(model_definition.pop("diversification", {}))
 
@@ -1320,12 +1340,6 @@ class InphestModel(object):
             run_logger.info("(CLADOGENETIC GEOGRAPHICAL RANGE EVOLUTION) Base weight of widespread vicariance speciation mode: {}".format(self.symbiont_cladogenesis_widespread_vicariance_speciation_weight))
             run_logger.info("(CLADOGENETIC GEOGRAPHICAL RANGE EVOLUTION) Base weight of founder event speciation ('jump dispersal') mode: {} (note that the effective weight of this event for each lineage is actually the product of this and the lineage-specific area gain weight)".format(self.symbiont_cladogenesis_founder_event_speciation_weight))
 
-        termination_conditions_d = dict(model_definition.pop("termination_conditions", {}))
-        self.max_time = termination_conditions_d.pop("max_time", self.host_history.end_time)
-        desc = "Simulation will terminate at time t = {}".format(self.max_time)
-        if run_logger is not None:
-            run_logger.info(desc)
-
         if model_definition:
             raise TypeError("Unsupported model keywords: {}".format(model_definition))
 
@@ -1389,13 +1403,6 @@ class InphestModel(object):
         d["single_area_vicariance_speciation_weight"] = self.cladogenesis_single_area_vicariance_speciation_weight
         d["widespread_vicariance_speciation_weight"] = self.cladogenesis_widespread_vicariance_speciation_weight
         d["founder_event_speciation_weight"] = self.cladogenesis_founder_event_speciation_weight
-        return d
-
-    def termination_conditions_as_definition(self):
-        d = collections.OrderedDict()
-        d["target_focal_area_lineages"] = self.target_focal_area_lineages
-        d["gsa_termination_focal_area_lineages"] = self.gsa_termination_focal_area_lineages
-        d["max_time"] = self.max_time
         return d
 
 if __name__ == "__main__":
