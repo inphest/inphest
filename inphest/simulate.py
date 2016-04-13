@@ -672,7 +672,7 @@ def repeat_run(
     host_history_samples_path = os.path.normpath(host_history_samples_path)
     run_logger.info("-inphest- Using host biogeographical regime samples from: {}".format(host_history_samples_path))
     hrs = model.HostHistorySamples()
-    rb_data_src = open(rb_data, "r")
+    rb_data_src = open(host_history_samples_path, "r")
     hrs.parse_host_biogeography(rb_data_src)
     # run_logger.info("-inphest- {} host biogeographical regime samples found in source '{}'".format(len(hrs.host_histories), host_history_samples_path))
     run_logger.info("-inphest- {} host biogeographical regime samples found in source".format(len(hrs.host_histories), host_history_samples_path))
