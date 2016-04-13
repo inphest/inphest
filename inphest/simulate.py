@@ -332,15 +332,15 @@ class InphestSimulator(object):
         for lineage in self.phylogeny.current_lineage_iter():
 
             # Diversification Process: Birth (Speciation)
-            event_fluxes["birth"] += self.model.mean_symbiont_lineage_diversification_birth_rate
-            birth_weight = self.model.symbiont_lineage_diversification_birth_weight_function(symbiont_lineage=lineage, simulation_elapsed_time=self.elapsed_time)
+            event_fluxes["birth"] += self.model.mean_symbiont_lineage_birth_rate
+            birth_weight = self.model.symbiont_lineage_birth_weight_function(symbiont_lineage=lineage, simulation_elapsed_time=self.elapsed_time)
             if birth_weight:
                 event_calls["birth"].append( (self.phylogeny.split_lineage, {"symbiont_lineage": lineage}) )
                 event_weights["birth"].append(birth_weight)
 
             # Diversification Process: Death (Extinction)
-            event_fluxes["death"] += self.model.mean_symbiont_lineage_diversification_death_rate
-            death_weight = self.model.symbiont_lineage_diversification_death_weight_function(symbiont_lineage=lineage, simulation_elapsed_time=self.elapsed_time)
+            event_fluxes["death"] += self.model.mean_symbiont_lineage_death_rate
+            death_weight = self.model.symbiont_lineage_death_weight_function(symbiont_lineage=lineage, simulation_elapsed_time=self.elapsed_time)
             if death_weight:
                 event_calls["death"].append( (self.phylogeny.extinguish_lineage, {"symbiont_lineage": lineage}) )
                 event_weights["death"].append(death_weight)

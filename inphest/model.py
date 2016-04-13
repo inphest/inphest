@@ -1172,36 +1172,36 @@ class InphestModel(object):
         diversification_d = dict(model_definition.pop("diversification", {}))
 
         ## speciation
-        self.mean_symbiont_lineage_diversification_birth_rate = diversification_d.pop("mean_symbiont_lineage_diversification_birth_rate", 0.03)
+        self.mean_symbiont_lineage_birth_rate = diversification_d.pop("mean_symbiont_lineage_birth_rate", 0.03)
         if run_logger is not None:
-            run_logger.info("(DIVERSIFICATION) Mean symbiont lineage diversification birth rate: {}".format(self.mean_symbiont_lineage_diversification_birth_rate))
-        if "symbiont_lineage_diversification_birth_weight" in diversification_d:
-            self.symbiont_lineage_diversification_birth_weight_function = RateFunction.from_definition_dict(diversification_d.pop("symbiont_lineage_diversification_birth_weight"))
+            run_logger.info("(DIVERSIFICATION) Mean symbiont lineage diversification birth rate: {}".format(self.mean_symbiont_lineage_birth_rate))
+        if "symbiont_lineage_birth_weight" in diversification_d:
+            self.symbiont_lineage_birth_weight_function = RateFunction.from_definition_dict(diversification_d.pop("symbiont_lineage_birth_weight"))
         else:
-            self.symbiont_lineage_diversification_birth_weight_function = RateFunction(
+            self.symbiont_lineage_birth_weight_function = RateFunction(
                     definition_type="lambda_definition",
                     definition_content="lambda **kwargs: 1.00",
                     description="fixed: 1.00",
                     )
         if run_logger is not None:
             run_logger.info("(DIVERSIFICATION) Setting symbiont lineage-specific birth weight function: {desc}".format(
-                desc=self.symbiont_lineage_diversification_birth_weight_function.description,))
+                desc=self.symbiont_lineage_birth_weight_function.description,))
 
         ## extinction
-        self.mean_symbiont_lineage_diversification_death_rate = diversification_d.pop("mean_symbiont_lineage_diversification_death_rate", 0.00)
+        self.mean_symbiont_lineage_death_rate = diversification_d.pop("mean_symbiont_lineage_death_rate", 0.00)
         if run_logger is not None:
-            run_logger.info("(DIVERSIFICATION) Mean symbiont lineage diversification death rate: {}".format(self.mean_symbiont_lineage_diversification_death_rate))
-        if "symbiont_lineage_diversification_death_weight" in diversification_d:
-            self.symbiont_lineage_diversification_death_weight_function = RateFunction.from_definition_dict(diversification_d.pop("symbiont_lineage_diversification_death_weight"))
+            run_logger.info("(DIVERSIFICATION) Mean symbiont lineage diversification death rate: {}".format(self.mean_symbiont_lineage_death_rate))
+        if "symbiont_lineage_death_weight" in diversification_d:
+            self.symbiont_lineage_death_weight_function = RateFunction.from_definition_dict(diversification_d.pop("symbiont_lineage_death_weight"))
         else:
-            self.symbiont_lineage_diversification_death_weight_function = RateFunction(
+            self.symbiont_lineage_death_weight_function = RateFunction(
                     definition_type="lambda_definition",
                     definition_content="lambda **kwargs: 1.00",
                     description="fixed: 1.00",
                     )
         if run_logger is not None:
             run_logger.info("(DIVERSIFICATION) Setting symbiont lineage-specific death weight function: {desc}".format(
-                desc=self.symbiont_lineage_diversification_death_weight_function.description,))
+                desc=self.symbiont_lineage_death_weight_function.description,))
 
         # Host Submodel
 
