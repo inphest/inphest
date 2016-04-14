@@ -28,13 +28,13 @@ setup(
     #         'inphest': ['libexec/*.R'],
     #     },
     include_package_data = True,
-    # scripts=[
+    scripts=[
     #         "bin/inphest-classify.py",
     #         "bin/inphest-profile-trees.py",
-    #         "bin/inphest-simulate.py",
+            "bin/inphest-simulate.py",
     #         "bin/inphest-summarize.py",
     #         "bin/inphest-generate-data-files-from-tip-labels.py",
-    #         ],
+            ],
     url="http://pypi.python.org/pypi/inphest/",
     license="LICENSE.txt",
     description="A Project",
