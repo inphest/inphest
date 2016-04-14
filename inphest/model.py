@@ -1020,7 +1020,6 @@ class InphestModel(object):
     @classmethod
     def create(
             cls,
-            host_history,
             model_definition_source,
             model_definition_type,
             interpolate_missing_model_values=False,
@@ -1050,20 +1049,6 @@ class InphestModel(object):
         m : ArchipelagoModel
             A fully-specified Archipelago model.
 
-        Example
-        -------
-
-            hrs = HostHistorySamples()
-            rb_data = os.path.join(utility.TEST_DATA_PATH, "revbayes", "bg_large.events.txt")
-            rb_data_src = open(rb_data, "r")
-            hrs.parse_host_biogeography(rb_data_src)
-            for host_history in hrs.host_histories:
-                im = InphestModel.create(
-                        host_history=host_history,
-                        model_definition_source="model1.json",
-                        model_definition_type="json",
-                        )
-
         """
         if model_definition_type == "python-dict-filepath":
             src = open(model_definition_source, "r")
@@ -1078,21 +1063,18 @@ class InphestModel(object):
         else:
             raise ValueError("Unrecognized model definition type: '{}'".format(model_definition_type))
         return cls.from_definition_dict(
-                host_history=host_history,
                 model_definition=model_definition,
                 run_logger=run_logger,
                 interpolate_missing_model_values=interpolate_missing_model_values)
 
     @classmethod
     def from_definition_dict(cls,
-            host_history,
             model_definition,
             interpolate_missing_model_values=False,
             run_logger=None):
         archipelago_model = cls()
         archipelago_model.parse_definition(
                 model_definition=model_definition,
-                host_history=host_history,
                 interpolate_missing_model_values=interpolate_missing_model_values,
                 run_logger=run_logger,
         )
@@ -1161,7 +1143,6 @@ class InphestModel(object):
 
     def parse_definition(self,
             model_definition,
-            host_history,
             run_logger=None,
             interpolate_missing_model_values=True):
 
@@ -1179,9 +1160,6 @@ class InphestModel(object):
         self.model_id = model_definition.pop("model_id", "Model1")
         if run_logger is not None:
             run_logger.info("Setting up model with identifier: '{}'".format(self.model_id))
-
-        # host regime
-        self.host_history = host_history
 
         # timing
         self.host_to_symbiont_time_scale_factor = float(model_definition.pop("host_to_symbiont_time_scale_factor", 1.00))
@@ -1405,14 +1383,3 @@ class InphestModel(object):
         d["founder_event_speciation_weight"] = self.cladogenesis_founder_event_speciation_weight
         return d
 
-if __name__ == "__main__":
-    hrs = HostHistorySamples()
-    rb_data = os.path.join(utility.TEST_DATA_PATH, "revbayes", "bg_large.events.txt")
-    rb_data_src = open(rb_data, "r")
-    hrs.parse_host_biogeography(rb_data_src)
-    for host_history in hrs.host_histories:
-        im = InphestModel.create(
-                host_history=host_history,
-                model_definition_source={},
-                model_definition_type="python-dict",
-                )

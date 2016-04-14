@@ -12,6 +12,7 @@ import inphest
 # from inphest import model
 from inphest import utility
 from inphest import simulate
+from inphest import model
 
 def get_example_model():
     model_definition = {}
@@ -78,7 +79,7 @@ def main():
             help="Run in debugging mode.")
 
     args = parser.parse_args()
-    if args.host_biogeographic_history is None:
+    if args.host_biogeographic_history is None and not args.create_example_model_file:
         sys.exit("Require path to host biogeographich history events to be specified.")
 
     config_d = {}

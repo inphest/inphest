@@ -48,6 +48,7 @@ class InphestSimulator(object):
 
     def __init__(self,
             inphest_model,
+            host_history,
             config_d,
             is_verbose_setup):
 
@@ -58,10 +59,11 @@ class InphestSimulator(object):
 
         # set up model
         self.model = inphest_model
+        self.host_history = host_history
 
         # initialize host system
         self.host_system = model.HostSystem(
-                host_history=self.model.host_history,
+                host_history=self.host_history,
                 host_to_symbiont_time_scale_factor=self.model.host_to_symbiont_time_scale_factor,
                 run_logger=self.run_logger,)
 
@@ -686,7 +688,6 @@ def repeat_run(
                     is_verbose_setup = False
                     model_setup_logger = None
                 inphest_model = model.InphestModel.create(
-                        host_history=host_history,
                         model_definition_source=model_definition_source,
                         model_definition_type=model_definition_type,
                         interpolate_missing_model_values=interpolate_missing_model_values,
@@ -700,6 +701,7 @@ def repeat_run(
                 #         )
                 inphest_simulator = InphestSimulator(
                     inphest_model=inphest_model,
+                    host_history=host_history,
                     config_d=config_d,
                     is_verbose_setup=is_verbose_setup,
                     )
