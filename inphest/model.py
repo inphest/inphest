@@ -1207,12 +1207,12 @@ class InphestModel(object):
         anagenetic_host_assemblage_evolution_d = dict(model_definition.pop("anagenetic_host_assemblage_evolution", {}))
 
         ### Anagenetic Host Gain
-        self.mean_host_gain_rate = anagenetic_host_assemblage_evolution_d.pop("mean_host_gain_rate", 0.03)
+        self.mean_symbiont_lineage_host_gain_rate = anagenetic_host_assemblage_evolution_d.pop("mean_symbiont_lineage_host_gain_rate", 0.03)
         if run_logger is not None:
             run_logger.info("(ANAGENETIC HOST ASSEMBLAGE EVOLUTION) Setting mean host gain rate: {desc}".format(
-                desc=self.mean_host_gain_rate,))
-        if "symbiont_lineage_host_gain_rate" in anagenetic_host_assemblage_evolution_d:
-            self.symbiont_lineage_host_gain_weight_function = RateFunction.from_definition_dict(anagenetic_host_assemblage_evolution_d.pop("symbiont_lineage_host_gain_rate"))
+                desc=self.mean_symbiont_lineage_host_gain_rate,))
+        if "symbiont_lineage_host_gain_weight" in anagenetic_host_assemblage_evolution_d:
+            self.symbiont_lineage_host_gain_weight_function = RateFunction.from_definition_dict(anagenetic_host_assemblage_evolution_d.pop("symbiont_lineage_host_gain_weight"))
         else:
             self.symbiont_lineage_host_gain_weight_function = RateFunction(
                     definition_type="lambda_definition",
@@ -1224,12 +1224,12 @@ class InphestModel(object):
                 desc=self.symbiont_lineage_host_gain_weight_function.description,))
 
         ### Anagenetic Host Loss
-        self.mean_host_loss_rate = anagenetic_host_assemblage_evolution_d.pop("mean_host_loss_rate", 0.00)
+        self.mean_symbiont_lineage_host_loss_rate = anagenetic_host_assemblage_evolution_d.pop("mean_symbiont_lineage_host_loss_rate", 0.00)
         if run_logger is not None:
             run_logger.info("(ANAGENETIC HOST ASSEMBLAGE EVOLUTION) Setting mean host loss rate: {desc}".format(
-                desc=self.mean_host_loss_rate,))
-        if "symbiont_lineage_host_loss_rate" in anagenetic_host_assemblage_evolution_d:
-            self.symbiont_lineage_host_loss_weight_function = RateFunction.from_definition_dict(anagenetic_host_assemblage_evolution_d.pop("symbiont_lineage_host_loss_rate"))
+                desc=self.mean_symbiont_lineage_host_loss_rate,))
+        if "symbiont_lineage_host_loss_weight" in anagenetic_host_assemblage_evolution_d:
+            self.symbiont_lineage_host_loss_weight_function = RateFunction.from_definition_dict(anagenetic_host_assemblage_evolution_d.pop("symbiont_lineage_host_loss_weight"))
         else:
             self.symbiont_lineage_host_loss_weight_function = RateFunction(
                     definition_type="lambda_definition",
@@ -1265,12 +1265,12 @@ class InphestModel(object):
         ### Anagenetic Geographical Area Gain
 
         anagenetic_geographical_range_evolution_d = dict(model_definition.pop("anagenetic_geographical_range_evolution", {}))
-        self.mean_area_gain_rate = anagenetic_geographical_range_evolution_d.pop("mean_area_gain_rate", 0.03)
+        self.mean_symbiont_lineage_area_gain_rate = anagenetic_geographical_range_evolution_d.pop("mean_symbiont_lineage_area_gain_rate", 0.03)
         if run_logger is not None:
             run_logger.info("(ANAGENETIC HOST ASSEMBLAGE EVOLUTION) Setting mean area gain rate: {desc}".format(
-                desc=self.mean_host_gain_rate,))
-        if "lineage_area_gain_rate" in anagenetic_geographical_range_evolution_d:
-            self.symbiont_lineage_area_gain_weight_function = RateFunction.from_definition_dict(anagenetic_geographical_range_evolution_d.pop("lineage_area_gain_rate"), self.trait_types)
+                desc=self.mean_symbiont_lineage_host_gain_rate,))
+        if "symbiont_lineage_area_gain_weight" in anagenetic_geographical_range_evolution_d:
+            self.symbiont_lineage_area_gain_weight_function = RateFunction.from_definition_dict(anagenetic_geographical_range_evolution_d.pop("symbiont_lineage_area_gain_weight"))
         else:
             self.symbiont_lineage_area_gain_weight_function = RateFunction(
                     definition_type="lambda_definition",
@@ -1283,12 +1283,12 @@ class InphestModel(object):
 
         ### Anagenetic Geographical Area Loss
         anagenetic_geographical_range_evolution_d = dict(model_definition.pop("anagenetic_geographical_range_evolution", {}))
-        self.mean_area_loss_rate = anagenetic_geographical_range_evolution_d.pop("mean_area_loss_rate", 0.0)
+        self.mean_symbiont_lineage_area_loss_rate = anagenetic_geographical_range_evolution_d.pop("mean_symbiont_lineage_area_loss_rate", 0.0)
         if run_logger is not None:
             run_logger.info("(ANAGENETIC HOST ASSEMBLAGE EVOLUTION) Setting mean area loss rate: {desc}".format(
-                desc=self.mean_host_loss_rate,))
-        if "lineage_area_loss_rate" in anagenetic_geographical_range_evolution_d:
-            self.symbiont_lineage_area_loss_weight_function = RateFunction.from_definition_dict(anagenetic_geographical_range_evolution_d.pop("lineage_area_loss_rate"), self.trait_types)
+                desc=self.mean_symbiont_lineage_host_loss_rate,))
+        if "symbiont_lineage_area_loss_weight" in anagenetic_geographical_range_evolution_d:
+            self.symbiont_lineage_area_loss_weight_function = RateFunction.from_definition_dict(anagenetic_geographical_range_evolution_d.pop("symbiont_lineage_area_loss_weight"))
         else:
             self.symbiont_lineage_area_loss_weight_function = RateFunction(
                     definition_type="lambda_definition",
@@ -1321,65 +1321,77 @@ class InphestModel(object):
         if model_definition:
             raise TypeError("Unsupported model keywords: {}".format(model_definition))
 
-    def encode_lineage(self,
-            symbiont_lineage,
-            set_label=False,
-            add_annotation=False,
-            ):
-        encoded_label = InphestModel.compose_encoded_label(symbiont_lineage=symbiont_lineage)
-        if set_label:
-            lineage.label =encoded_label
-        if add_annotation:
-            lineage.annotations.drop()
-            lineage.annotations.add_new("traits_v", traits_v)
-            lineage.annotations.add_new("distribution", areas_v)
-            for trait_idx, trait in enumerate(self.trait_types):
-                lineage.annotations.add_new(trait.label, lineage.traits_vector[trait_idx])
-            area_list = []
-            for area_idx, area in enumerate(self.geography.areas):
-                if exclude_supplemental_areas and area.is_supplemental:
-                    continue
-                if lineage.distribution_vector[area_idx] == 1:
-                    area_list.append(area.label)
-            lineage.annotations.add_new("areas", area_list)
-        return encoded_label
+    # def encode_lineage(self,
+    #         symbiont_lineage,
+    #         set_label=False,
+    #         add_annotation=False,
+    #         ):
+    #     encoded_label = InphestModel.compose_encoded_label(symbiont_lineage=symbiont_lineage)
+    #     if set_label:
+    #         lineage.label =encoded_label
+    #     if add_annotation:
+    #         lineage.annotations.drop()
+    #         lineage.annotations.add_new("traits_v", traits_v)
+    #         lineage.annotations.add_new("distribution", areas_v)
+    #         for trait_idx, trait in enumerate(self.trait_types):
+    #             lineage.annotations.add_new(trait.label, lineage.traits_vector[trait_idx])
+    #         area_list = []
+    #         for area_idx, area in enumerate(self.geography.areas):
+    #             if exclude_supplemental_areas and area.is_supplemental:
+    #                 continue
+    #             if lineage.distribution_vector[area_idx] == 1:
+    #                 area_list.append(area.label)
+    #         lineage.annotations.add_new("areas", area_list)
+    #     return encoded_label
 
     def write_model(self, out):
         model_definition = collections.OrderedDict()
         model_definition["model_id"] = self.model_id
-        model_definition["areas"] = self.geography.as_definition()
-        model_definition["traits"] = self.trait_types.as_definition()
+        model_definition["host_to_symbiont_time_scale_factor"] = self.host_to_symbiont_time_scale_factor
         model_definition["diversification"] = self.diversification_as_definition()
-        model_definition["anagenetic_range_evolution"] = self.anagenetic_range_evolution_as_definition()
-        model_definition["cladogenetic_range_evolution"] = self.cladogenetic_range_evolution_as_definition()
-        model_definition["termination_conditions"] = self.termination_conditions_as_definition()
+        model_definition["anagenetic_host_assemblage_evolution"] = self.anagenetic_host_assemblage_evolution_as_definition()
+        model_definition["cladogenetic_host_assemblage_evolution"] = self.cladogenetic_host_assemblage_evolution_as_definition()
+        model_definition["anagenetic_geographical_range_evolution"] = self.anagenetic_geographical_range_evolution_as_definition()
+        model_definition["cladogenetic_geographical_range_evolution"] = self.cladogenetic_geographical_range_evolution_as_definition()
         json.dump(model_definition, out, indent=4, separators=(',', ': '))
 
     def diversification_as_definition(self):
         d = collections.OrderedDict()
-        d["lineage_birth_rate"] = self.lineage_birth_weight_function.as_definition()
-        d["lineage_death_rate"] = self.lineage_death_weight_function.as_definition()
+        d["mean_symbiont_lineage_birth_rate"] = self.mean_symbiont_lineage_birth_rate
+        d["lineage_birth_rate"] = self.symbiont_lineage_birth_weight_function.as_definition()
+        d["mean_symbiont_lineage_death_rate"] = self.mean_symbiont_lineage_death_rate
+        d["lineage_death_rate"] = self.symbiont_lineage_death_weight_function.as_definition()
         return d
 
-    def anagenetic_range_evolution_as_definition(self):
+    def anagenetic_host_assemblage_evolution_as_definition(self):
         d = collections.OrderedDict()
-        # if self.global_area_gain_rate is not None and self.mean_area_gain_rate is not None:
-        #     raise TypeError("Both 'global_area_gain_rate' and 'mean_area_gain_rate' are populated")
-        # elif self.global_area_gain_rate is None and self.mean_area_gain_rate is None:
-        #     raise TypeError("Neither 'global_area_gain_rate' and 'mean_area_gain_rate' are populated")
-        # elif self.global_area_gain_rate is not None:
-        #     d["global_area_gain_rate"] = self.global_area_gain_rate
-        # else:
-        #     d["mean_area_gain_rate"] = self.mean_area_gain_rate
-        d["lineage_area_gain_rate"] = self.lineage_area_gain_weight_function.as_definition()
-        d["lineage_area_loss_rate"] = self.lineage_area_loss_weight_function.as_definition()
+        d["mean_symbiont_lineage_host_gain_rate"] = self.mean_symbiont_lineage_host_gain_rate
+        d["symbiont_lineage_host_gain_weight"] = self.symbiont_lineage_host_gain_weight_function.as_definition()
+        d["mean_symbiont_lineage_host_loss_rate"] = self.mean_symbiont_lineage_host_loss_rate
+        d["symbiont_lineage_host_loss_weight"] = self.symbiont_lineage_host_loss_weight_function.as_definition()
         return d
 
-    def cladogenetic_range_evolution_as_definition(self):
+    def cladogenetic_host_assemblage_evolution_as_definition(self):
         d = collections.OrderedDict()
-        d["sympatric_subset_speciation_weight"] = self.cladogenesis_sympatric_subset_speciation_weight
-        d["single_area_vicariance_speciation_weight"] = self.cladogenesis_single_area_vicariance_speciation_weight
-        d["widespread_vicariance_speciation_weight"] = self.cladogenesis_widespread_vicariance_speciation_weight
-        d["founder_event_speciation_weight"] = self.cladogenesis_founder_event_speciation_weight
+        d["sympatric_subset_speciation_weight"] = self.host_cladogenesis_sympatric_subset_speciation_weight
+        d["single_host_vicariance_speciation_weight"] = self.host_cladogenesis_single_host_vicariance_speciation_weight
+        d["widespread_vicariance_speciation_weight"] = self.host_cladogenesis_widespread_vicariance_speciation_weight
+        d["founder_event_speciation_weight"] = self.host_cladogenesis_founder_event_speciation_weight
+        return d
+
+    def anagenetic_geographical_range_evolution_as_definition(self):
+        d = collections.OrderedDict()
+        d["mean_symbiont_lineage_area_gain_rate"] = self.mean_symbiont_lineage_area_gain_rate
+        d["symbiont_lineage_area_gain_weight"] = self.symbiont_lineage_area_gain_weight_function.as_definition()
+        d["mean_symbiont_lineage_area_loss_rate"] = self.mean_symbiont_lineage_area_loss_rate
+        d["symbiont_lineage_area_loss_weight"] = self.symbiont_lineage_area_loss_weight_function.as_definition()
+        return d
+
+    def cladogenetic_geographical_range_evolution_as_definition(self):
+        d = collections.OrderedDict()
+        d["sympatric_subset_speciation_weight"] = self.symbiont_cladogenesis_sympatric_subset_speciation_weight
+        d["single_area_vicariance_speciation_weight"] = self.symbiont_cladogenesis_single_area_vicariance_speciation_weight
+        d["widespread_vicariance_speciation_weight"] = self.symbiont_cladogenesis_widespread_vicariance_speciation_weight
+        d["founder_event_speciation_weight"] = self.symbiont_cladogenesis_founder_event_speciation_weight
         return d
 

@@ -342,7 +342,7 @@ class InphestSimulator(object):
                 event_weights["death"].append(death_weight)
 
             # Anagenetic Host Assemblage Evolution: Host Gain
-            event_fluxes["host_gain"] += (self.model.mean_area_gain_rate)
+            event_fluxes["host_gain"] += (self.model.mean_symbiont_lineage_area_gain_rate)
             infected_hosts = {}
             uninfected_hosts = {}
             num_potential_new_host_infection_events = 0
@@ -378,7 +378,7 @@ class InphestSimulator(object):
                     event_weights["host_gain"].extend( transmission_event_rates )
 
             # Anagenetic Host Assemblage Evolution: Host Loss
-            event_fluxes["host_loss"] += self.model.mean_host_loss_rate
+            event_fluxes["host_loss"] += self.model.mean_symbiont_lineage_host_loss_rate
             for host_lineage in lineage.host_iter():
                 host_loss_weight = self.model.symbiont_lineage_host_loss_weight_function(
                         symbiont_lineage=lineage,
@@ -390,7 +390,7 @@ class InphestSimulator(object):
                         event_weights["host_loss"].append(host_loss_weight)
 
             # Anagenetic Geographical Evolution: Area Gain
-            event_fluxes["area_gain"] += (self.model.mean_area_gain_rate)
+            event_fluxes["area_gain"] += (self.model.mean_symbiont_lineage_area_gain_rate)
             occupied_areas = {}
             unoccupied_areas = {}
             num_potential_new_area_infection_events = 0
@@ -428,7 +428,7 @@ class InphestSimulator(object):
                     event_weights["area_gain"].extend( dispersal_event_rates )
 
             # Anagenetic Geographical Evolution: Area Loss
-            event_fluxes["area_loss"] += self.model.mean_area_loss_rate
+            event_fluxes["area_loss"] += self.model.mean_symbiont_lineage_area_loss_rate
             for host_lineage in lineage.host_iter():
                 for area in lineage.areas_in_host_iter(host_lineage):
                     area_loss_rate = self.model.symbiont_lineage_area_loss_weight_function(
