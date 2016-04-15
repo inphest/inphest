@@ -159,7 +159,7 @@ class InphestSimulator(object):
         if config_d.pop("store_model_description", True):
             self.model_description_file = config_d.pop("model_description_file", None)
             if self.model_description_file is None:
-                self.model_description_file = open(self.output_prefix + ".input-model.json", "w")
+                self.model_description_file = open(self.output_prefix + ".model.log.json", "w")
             if verbose:
                 self.run_logger.info("Model description filepath: {}".format(self.model_description_file.name))
         else:
