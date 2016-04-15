@@ -159,7 +159,7 @@ class InphestSimulator(object):
         if config_d.pop("store_model_description", True):
             self.model_description_file = config_d.pop("model_description_file", None)
             if self.model_description_file is None:
-                self.model_description_file = open(self.output_prefix + ".model.json", "w")
+                self.model_description_file = open(self.output_prefix + ".input-model.json", "w")
             if verbose:
                 self.run_logger.info("Model description filepath: {}".format(self.model_description_file.name))
         else:
@@ -190,8 +190,7 @@ class InphestSimulator(object):
 
         ### Save model
         if self.model_description_file is not None:
-            self.run_logger.warning("[WARNING] Model description output not implemented yet")
-            # self.model.write_model(self.model_description_file)
+            self.model.write_model(self.model_description_file)
 
         ### Initialize time
         self.elapsed_time = 0.0
