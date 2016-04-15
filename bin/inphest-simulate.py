@@ -23,7 +23,7 @@ def main():
             description="{} Biogeographical Simulator".format(inphest.description())
             )
     host_options = parser.add_argument_group("Host Biogeography Options")
-    host_options.add_argument("--host-biogeographic-history",
+    host_options.add_argument("-H", "--host-biogeographic-history",
             metavar="HOST-EVENT-FILE",
             default=None,
             help="Path to file providing the host biogeographic events.")
@@ -80,7 +80,7 @@ def main():
 
     args = parser.parse_args()
     if args.host_biogeographic_history is None and not args.create_example_model_file:
-        sys.exit("Require path to host biogeographich history events to be specified.")
+        sys.exit("Require path to host biogeographic history events to be specified.")
 
     config_d = {}
     if args.model_file is None:
