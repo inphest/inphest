@@ -27,6 +27,10 @@ def main():
             metavar="HOST-EVENT-FILE",
             default=None,
             help="Path to file providing the host biogeographic events.")
+    host_options.add_argument("-F", "--host-biogeographic-history-format",
+            choices=["revbayes", "archipelago"],
+            default="revbayes",
+            help="Format of the host biogeographic history.")
 
     model_options = parser.add_argument_group("Simulation Model")
     model_options.add_argument("model_file",
@@ -136,6 +140,7 @@ def main():
             output_prefix=args.output_prefix,
             nreps=args.nreps,
             host_history_samples_path=args.host_biogeographic_history,
+            host_history_samples_format=args.host_biogeographic_history_format,
             model_definition_source=model_definition_source,
             model_definition_type=model_definition_type,
             interpolate_missing_model_values=interpolate_missing_model_values,

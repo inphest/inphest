@@ -278,6 +278,74 @@ class HostHistorySamples(object):
 
     def parse_host_biogeography(self,
             src,
+            schema,
+            validate=True,
+            ignore_validation_errors=False):
+        if schema == "revbayes":
+            self.parse_rb_host_biogeography(src=src,
+                    validate=validate,
+                    ignore_validation_errors=ignore_validation_errors)
+        else:
+            self.parse_archipelago_host_biogeography(src=src,
+                    validate=validate,
+                    ignore_validation_errors=ignore_validation_errors)
+
+    def parse_archipelago_host_biogeography(self,
+            src,
+            validate=True,
+            ignore_validation_errors=False):
+        data = json.load(src)
+        for history_sample in data:
+            host_history = HostHistory(taxon_namespace=self.taxon_namespace)
+            for lineage_d in history_sample["lineages"]:
+                lineage = HostHistory.HostLineageDefinition(
+                        lineage_id=lineage_d["lineage_id"],
+                        lineage_parent_id=lineage_d["lineage_parent_id"],
+                        leafset_bitstring=lineage_d["leafset_bitstring"],
+                        split_bitstring=lineage_d["split_bitstring"],
+                        lineage_start_time=lineage_d["lineage_start_time"],
+                        lineage_end_time=lineage_d["lineage_end_time"],
+                        lineage_start_distribution_bitstring=lineage_d["lineage_start_distribution_bitstring"],
+                        lineage_end_distribution_bitstring=lineage_d["lineage_end_distribution_bitstring"],
+                        is_seed_node=lineage_d["is_seed_node"],
+                        is_leaf=lineage_d["is_leaf"],
+                        )
+                assert lineage.lineage_id not in host_history.lineages
+                assert lineage.lineage_start_time <= lineage.lineage_end_time, "{}, {}".format(lineage.lineage_start_time, lineage.lineage_end_time)
+                host_history.lineages[lineage.lineage_id] = lineage
+            for event_d in history_sample["events"]:
+                if event_d["event_type"] == "extinction":
+                    continue
+                if event_d["event_type"] == "trait_evolution":
+                    continue
+                event = HostHistory.HostEvent(
+                    event_time=event_d["event_time"],
+                    weight=1.0,
+                    lineage_id=event_d["lineage_id"],
+                    event_type=event_d["event_type"],
+                    event_subtype=event_d["event_subtype"],
+                    area_idx=event_d.get("state_idx", None),
+                    child0_lineage_id=event_d.get("child0_lineage_id", None),
+                    child1_lineage_id=event_d.get("child1_lineage_id", None),
+                    )
+                assert event.lineage_id in host_history.lineages
+                host_history.events.append(event)
+            host_tree = dendropy.Tree.get(
+                    data=history_sample["tree"]["newick"],
+                    schema="newick",
+                    )
+            # host_tree = None
+            host_history.compile(
+                tree=host_tree,
+                start_time=0.0,
+                end_time=history_sample["tree"]["end_time"],
+                )
+            if validate:
+                host_history.validate()
+            self.host_histories.append(host_history)
+
+    def parse_rb_host_biogeography(self,
+            src,
             validate=True,
             ignore_validation_errors=False):
         """

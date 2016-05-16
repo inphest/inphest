@@ -573,6 +573,7 @@ def repeat_run(
         output_prefix,
         nreps,
         host_history_samples_path,
+        host_history_samples_format,
         model_definition_source,
         model_definition_type="python-dict",
         config_d=None,
@@ -596,6 +597,8 @@ def repeat_run(
         re-used for each replicate.
     host_history_samples_path : object
         Path to host biogeographical history samples.
+    host_history_samples_format : object
+        Format of host biogeographical history samples.
     model_definition_source : object
         See 'model_definition_type' argument for values this can take.
     model_definition_type : str
@@ -667,9 +670,10 @@ def repeat_run(
     host_history_samples_path = os.path.normpath(host_history_samples_path)
     run_logger.info("-inphest- Using host biogeographical regime samples from: {}".format(host_history_samples_path))
     hrs = model.HostHistorySamples()
-    rb_data_src = open(host_history_samples_path, "r")
-    hrs.parse_host_biogeography(rb_data_src)
-    # run_logger.info("-inphest- {} host biogeographical regime samples found in source '{}'".format(len(hrs.host_histories), host_history_samples_path))
+    hrs.parse_host_biogeography(
+            src=open(host_history_samples_path, "r"),
+            schema=host_history_samples_format,
+            )
     run_logger.info("-inphest- {} host biogeographical regime samples found in source".format(len(hrs.host_histories), host_history_samples_path))
 
     current_rep = 0
