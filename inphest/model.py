@@ -187,7 +187,7 @@ class HostHistory(object):
         "lineage_parent_id",
         "leafset_bitstring",
         "split_bitstring",
-        "rb_index",
+        # "rb_index",
         "lineage_start_time",          # time lineage appears
         "lineage_end_time",            # time lineage ends
         "lineage_start_distribution_bitstring",  #   distribution/range (area set) at beginning of lineage
@@ -305,7 +305,7 @@ class HostHistorySamples(object):
                     lineage_parent_id=edge_entry["parent_edge_id"],
                     leafset_bitstring=edge_entry["leafset_bitstring"],
                     split_bitstring=edge_entry["split_bitstring"],
-                    rb_index=edge_entry["rb_index"],
+                    # rb_index=edge_entry["rb_index"],
                     lineage_start_time=edge_entry["edge_start_time"],
                     lineage_end_time=edge_entry["edge_end_time"],
                     lineage_start_distribution_bitstring=edge_entry["edge_starting_state"],
