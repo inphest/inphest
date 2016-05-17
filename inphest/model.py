@@ -248,8 +248,8 @@ class HostHistory(object):
             distribution_bitlist = list(self.lineages[lineage_id].lineage_start_distribution_bitstring)
             lineage_events[event.lineage_id].sort(key=lambda x: x.event_time, reverse=False)
             for event in lineage_events[lineage_id]:
-                assert event.event_time >= self.lineages[lineage_id].lineage_start_time
-                assert event.event_time <= self.lineages[lineage_id].lineage_end_time
+                assert event.event_time >= self.lineages[lineage_id].lineage_start_time, "{}: {} >= {}: False".format(lineage_id, event.event_time, self.lineages[lineage_id].lineage_start_time)
+                assert event.event_time <= self.lineages[lineage_id].lineage_end_time, "{}: {} <= {}: False".format(lineage_id, event.event_time, self.lineages[lineage_id].lineage_end_time)
                 if event.event_type == "anagenesis" and event.event_subtype == "area_gain":
                     assert distribution_bitlist[event.area_idx] == "0", "Lineage {} at time {}: Trying to add area with index {} to distribution that already has area: {}".format(
                             lineage_id,
@@ -274,7 +274,6 @@ class HostHistorySamples(object):
 
     def __init__(self):
         self.host_histories = []
-        self.taxon_namespace = dendropy.TaxonNamespace()
 
     def parse_host_biogeography(self,
             src,
@@ -296,7 +295,8 @@ class HostHistorySamples(object):
             ignore_validation_errors=False):
         data = json.load(src)
         for history_sample in data:
-            host_history = HostHistory(taxon_namespace=self.taxon_namespace)
+            taxon_namespace = dendropy.TaxonNamespace(history_sample["leaf_labels"])
+            host_history = HostHistory(taxon_namespace=taxon_namespace)
             for lineage_d in history_sample["lineages"]:
                 lineage = HostHistory.HostLineageDefinition(
                         lineage_id=lineage_d["lineage_id"],
@@ -333,7 +333,10 @@ class HostHistorySamples(object):
             host_tree = dendropy.Tree.get(
                     data=history_sample["tree"]["newick"],
                     schema="newick",
+                    rooting="force-rooted",
+                    taxon_namespace=taxon_namespace,
                     )
+            host_tree.encode_bipartitions()
             # host_tree = None
             host_history.compile(
                 tree=host_tree,
@@ -453,7 +456,7 @@ class HostLineage(object):
         self.lineage_parent_id = host_history_lineage_definition.lineage_parent_id
         self.leafset_bitstring = host_history_lineage_definition.leafset_bitstring
         self.split_bitstring = host_history_lineage_definition.split_bitstring
-        self.rb_index = host_history_lineage_definition.rb_index
+        # self.rb_index = host_history_lineage_definition.rb_index
         self.start_time = host_history_lineage_definition.lineage_start_time * self.host_to_symbiont_time_scale_factor
         self.end_time = host_history_lineage_definition.lineage_end_time * self.host_to_symbiont_time_scale_factor
         self.start_distribution_bitstring = host_history_lineage_definition.lineage_start_distribution_bitstring
