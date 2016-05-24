@@ -542,6 +542,8 @@ class InphestSimulator(object):
         if self.is_encode_nodes:
             k1 = set(self.host_system.extant_host_lineages_at_current_time(self.elapsed_time))
             k2 = set(self.host_system.leaf_host_lineages)
+            assert k1
+            assert k2
             s1 = k1 - k2
             s2 = k2 - k1
             print("\n")
@@ -549,7 +551,7 @@ class InphestSimulator(object):
             for v_s1 in s1:
                 print("{}".format(v_s1.lineage_id))
             print("In second set but not in first: {}".format(s2))
-            for v_s2 in s2:
+            for v_s2 in k2:
                 print("{}: {}".format(v_s2.lineage_id, v_s2.lineage_parent_id))
             print("\n")
             assert k1 == k2
