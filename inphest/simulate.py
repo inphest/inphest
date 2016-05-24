@@ -540,8 +540,22 @@ class InphestSimulator(object):
 
     def write_tree(self, out, tree):
         if self.is_encode_nodes:
+            k1 = set(self.host_system.extant_host_lineages_at_current_time(self.elapsed_time))
+            k2 = set(self.host_system.leaf_host_lineages)
+            s1 = k1 - k2
+            s2 = k2 - k1
+            print("\n")
+            print("In first set but not in second: {}".format(s1))
+            for v_s1 in s1:
+                print("{}".format(v_s1.lineage_id))
+            print("In second set but not in first: {}".format(s2))
+            for v_s2 in s2:
+                print("{}: {}".format(v_s2.lineage_id, v_s2.lineage_parent_id))
+            print("\n")
+            assert k1 == k2
             host_lineages = self.host_system.extant_host_lineages_at_current_time(self.elapsed_time)
             host_lineages = self.host_system.leaf_host_lineages
+
             # host_lineages = self.host_system.host_lineages
             for host_lineage in host_lineages:
                 # print("{}: {} ({} to {})".format(self.elapsed_time, host_lineage.lineage_id, host_lineage.start_time, host_lineage.end_time))

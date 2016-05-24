@@ -468,6 +468,9 @@ class HostLineage(object):
         self.extancy = "pre"
         self.debug_mode = False
 
+    def __str__(self):
+        return str(self.lineage_id)
+
     def activate(self, simulation_elapsed_time=None, debug_mode=None):
         assert self.extancy == "pre"
         if debug_mode is not None:
