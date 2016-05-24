@@ -248,8 +248,9 @@ class HostHistory(object):
             distribution_bitlist = list(self.lineages[lineage_id].lineage_start_distribution_bitstring)
             lineage_events[event.lineage_id].sort(key=lambda x: x.event_time, reverse=False)
             for event in lineage_events[lineage_id]:
-                assert event.event_time >= self.lineages[lineage_id].lineage_start_time, "{}: {} >= {}: False".format(lineage_id, event.event_time, self.lineages[lineage_id].lineage_start_time)
-                assert event.event_time <= self.lineages[lineage_id].lineage_end_time, "{}: {} <= {}: False".format(lineage_id, event.event_time, self.lineages[lineage_id].lineage_end_time)
+                assert utility.is_in_range(event.event_time, self.lineages[lineage_id].lineage_start_time, self.lineages[lineage_id].lineage_end_time,), "{}: {} <= {} <= {}: False".format(lineage_id, self.lineages[lineage_id].lineage_start_time, event.event_time, self.lineages[lineage_id].lineage_end_time)
+                # assert event.event_time >= self.lineages[lineage_id].lineage_start_time, "{}: {} >= {}: False".format(lineage_id, event.event_time, self.lineages[lineage_id].lineage_start_time)
+                # assert event.event_time <= self.lineages[lineage_id].lineage_end_time, "{}: {} <= {}: False".format(lineage_id, event.event_time, self.lineages[lineage_id].lineage_end_time)
                 if event.event_type == "anagenesis" and event.event_subtype == "area_gain":
                     assert distribution_bitlist[event.area_idx] == "0", "Lineage {} at time {}: Trying to add area with index {} to distribution that already has area: {}".format(
                             lineage_id,
@@ -473,8 +474,7 @@ class HostLineage(object):
             self.debug_mode = debug_mode
         if simulation_elapsed_time is not None:
             try:
-                assert simulation_elapsed_time >= self.start_time
-                assert simulation_elapsed_time <= self.end_time
+                assert utility.is_in_range(simulation_elapsed_time, self.start_time, self.end_time,), "{}: {} <= {} <= {}: False".format(lineage_id, self.start_time, simulation_elapsed_time, self.end_time)
             except AssertionError:
                 print("{}, start at {}, end at {}, current time = {}".format(self.lineage_id, self.start_time, self.end_time, simulation_elapsed_time))
                 raise
@@ -564,21 +564,35 @@ class HostLineage(object):
             self.end_time,
             simulation_elapsed_time,
             self.extancy))
-        if simulation_elapsed_time < self.start_time:
+        # if simulation_elapsed_time < self.start_time:
+        #     assert self.extancy == "pre", message
+        # elif simulation_elapsed_time > self.end_time:
+        #     assert self.extancy == "post", message
+        # elif simulation_elapsed_time == self.start_time:
+        #     assert self.extancy == "current" or self.extancy == "pre", message
+        # elif simulation_elapsed_time == self.end_time:
+        #     assert self.extancy == "current" or self.extancy == "post", message
+        # else:
+        #     assert self.extancy == "current", message
+        diff_start_time = simulation_elapsed_time - self.start_time
+        diff_end_time = simulation_elapsed_time - self.end_time
+        epsilon = 1e-6
+        # print(diff_start_time)
+        # print(diff_end_time)
+        if diff_start_time < -epsilon:
             assert self.extancy == "pre", message
-        elif simulation_elapsed_time > self.end_time:
+        elif diff_end_time > epsilon:
             assert self.extancy == "post", message
-        elif simulation_elapsed_time == self.start_time:
-            assert self.extancy == "current" or self.extancy == "pre"
-        elif simulation_elapsed_time == self.end_time:
-            assert self.extancy == "current" or self.extancy == "post"
+        elif abs(diff_start_time) < epsilon:
+            assert self.extancy == "current" or self.extancy == "pre", message
+        elif abs(diff_end_time) < epsilon:
+            assert self.extancy == "current" or self.extancy == "post", message
         else:
-            assert self.extancy == "current"
+            assert self.extancy == "current", message
 
     def debug_check_distribution(self, simulation_elapsed_time):
         if self.extancy == "current":
-            assert simulation_elapsed_time >= self.start_time
-            assert simulation_elapsed_time <= self.end_time
+            assert utility.is_in_range(simulation_elapsed_time, self.start_time, self.end_time,), "{}: {} <= {} <= {}: False".format(lineage_id, self.start_time, simulation_elapsed_time, self.end_time)
             if self.debug_mode:
                 for area_idx, presence in enumerate(self._current_distribution_check_bitlist):
                     area = self.host_system.areas[area_idx]
@@ -656,8 +670,13 @@ class HostSystem(object):
         for host_history_lineage_id_definition in self.host_history.lineages.values():
             if num_areas is None:
                 num_areas = len(host_history_lineage_id_definition.lineage_start_distribution_bitstring)
+            # print("{}: ({}) {} => {}".format(
+            #         host_history_lineage_id_definition.lineage_id,
+            #         num_areas,
+            #         host_history_lineage_id_definition.lineage_start_distribution_bitstring,
+            #         host_history_lineage_id_definition.lineage_end_distribution_bitstring))
             assert num_areas == len(host_history_lineage_id_definition.lineage_start_distribution_bitstring)
-            assert num_areas == len(host_history_lineage_id_definition.lineage_end_distribution_bitstring)
+            assert num_areas == len(host_history_lineage_id_definition.lineage_end_distribution_bitstring),  "{}: {}".format(num_areas, host_history_lineage_id_definition.lineage_end_distribution_bitstring)
         self.num_areas = num_areas
         self.areas = []
         for area_idx in range(self.num_areas):

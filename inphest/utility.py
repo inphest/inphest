@@ -11,6 +11,7 @@
 ##############################################################################
 
 
+import decimal
 import sys
 import os
 import logging
@@ -63,6 +64,15 @@ def dump_stack():
             print("{}: {}".format(filename, line_num))
         else:
             print("{}: {}: {}".format(filename, line_num, source_code[source_index].strip()))
+
+def is_in_range(x, a, b):
+    """
+    Checks if $x$ is in $[a, b]$, taking into account floating-point error.
+    """
+    x = decimal.Decimal("{:0.8f}".format(x))
+    a = decimal.Decimal("{:0.8f}".format(a))
+    b = decimal.Decimal("{:0.8f}".format(b))
+    return a <= x <= b
 
 class IndexGenerator(object):
 

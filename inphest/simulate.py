@@ -540,25 +540,32 @@ class InphestSimulator(object):
 
     def write_tree(self, out, tree):
         if self.is_encode_nodes:
-            # host_lineages = self.host_system.extant_host_lineages_at_current_time(self.elapsed_time)
-            # host_lineages = self.host_system.leaf_host_lineages
-            host_lineages = self.host_system.host_lineages
+            host_lineages = self.host_system.extant_host_lineages_at_current_time(self.elapsed_time)
+            host_lineages = self.host_system.leaf_host_lineages
+            # host_lineages = self.host_system.host_lineages
+            for host_lineage in host_lineages:
+                # print("{}: {} ({} to {})".format(self.elapsed_time, host_lineage.lineage_id, host_lineage.start_time, host_lineage.end_time))
+                host_lineage.debug_check(simulation_elapsed_time=self.elapsed_time)
+                # assert self.elapsed_time >= host_lineage.start_time and self.elapsed_time <= host_lineage.end_time
             lineage_labels = {}
-            for symbiont_lineage in tree:
+            for symbiont_lineage in tree.leaf_node_iter():
+                # print(">>> {}".format(symbiont_lineage._infected_hosts))
+                assert len(symbiont_lineage._infected_hosts)
                 current_hosts = []
                 for idx, host_lineage in enumerate(host_lineages):
                     if symbiont_lineage.has_host(host_lineage):
                         current_hosts.append("1")
                     else:
                         current_hosts.append("0")
+                assert "1" in current_hosts
                 current_hosts_bitstring = "".join(current_hosts)
-                label = "s{lineage_index}{sep}{host_occurrences}".format(
+                label = "s{lineage_index}{sep}{hosts_occupied}".format(
                         lineage_index=symbiont_lineage.index,
                         sep=model.InphestModel._LABEL_COMPONENTS_SEPARATOR,
-                        host_occurrences=current_hosts_bitstring,
+                        hosts_occupied=current_hosts_bitstring,
                         )
                 lineage_labels[symbiont_lineage] = label
-            labelf = lambda x: lineage_labels[x]
+            labelf = lambda x: lineage_labels.get(x, None)
         else:
             labelf = InphestSimulator.simple_node_label_function
         tree.write_to_stream(
