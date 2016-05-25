@@ -118,7 +118,7 @@ class InphestSimulator(object):
         if not self.trees_file:
             self.run_logger.warning("No trees will be stored!")
 
-        self.is_suppress_internal_node_labels = config_d.pop("suppress_internal_node_labels", False)
+        self.is_suppress_internal_node_labels = config_d.pop("suppress_internal_node_labels", True)
         if verbose:
             self.run_logger.info("Internal node labels will{} be written on trees".format(" not" if self.is_suppress_internal_node_labels else ""))
 
@@ -478,6 +478,8 @@ class InphestSimulator(object):
                     except model.SymbiontLineage.NullDistributionException:
                         self.phylogeny.extinguish_lineage(symbiont_lineage)
             host_lineage.remove_area(area)
+        elif host_event.event_type == "extinction":
+            assert False
         elif host_event.event_type == "cladogenesis":
             host_child0_lineage = self.host_system.host_lineages_by_id[host_event.child0_lineage_id]
             self.activate_host_lineage(host_child0_lineage)
@@ -541,22 +543,22 @@ class InphestSimulator(object):
     def write_tree(self, out, tree):
         if self.is_encode_nodes:
             k1 = set(self.host_system.extant_host_lineages_at_current_time(self.elapsed_time))
-            k2 = set(self.host_system.leaf_host_lineages)
+            k2 = set(self.host_system.extant_leaf_host_lineages)
             assert k1
             assert k2
-            s1 = k1 - k2
-            s2 = k2 - k1
-            print("\n")
-            print("In first set but not in second: {}".format(s1))
-            for v_s1 in s1:
-                print("{}".format(v_s1.lineage_id))
-            print("In second set but not in first: {}".format(s2))
-            for v_s2 in k2:
-                print("{}: {}".format(v_s2.lineage_id, v_s2.lineage_parent_id))
-            print("\n")
+            # s1 = k1 - k2
+            # s2 = k2 - k1
+            # print("\n")
+            # print("In first set but not in second: {}".format(s1))
+            # for v_s1 in s1:
+            #     print("{}".format(v_s1.lineage_id))
+            # print("In second set but not in first: {}".format(s2))
+            # for v_s2 in k2:
+            #     print("{}: {}".format(v_s2.lineage_id, v_s2.lineage_parent_id))
+            # print("\n")
             assert k1 == k2
-            host_lineages = self.host_system.extant_host_lineages_at_current_time(self.elapsed_time)
-            host_lineages = self.host_system.leaf_host_lineages
+            # host_lineages = self.host_system.extant_host_lineages_at_current_time(self.elapsed_time)
+            host_lineages = self.host_system.extant_leaf_host_lineages
 
             # host_lineages = self.host_system.host_lineages
             for host_lineage in host_lineages:

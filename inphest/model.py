@@ -194,6 +194,7 @@ class HostHistory(object):
         "lineage_end_distribution_bitstring",    #   distribution/range (area set) at end of lineage
         "is_seed_node",
         "is_leaf",
+        "is_extant_leaf",
     ])
 
     HostEvent = collections.namedtuple("HostEvent", [
@@ -224,7 +225,7 @@ class HostHistory(object):
         self.lineage_distance_matrix = {}
         for node1 in ndm:
             key1 = int(node1.edge.bipartition.split_bitmask)
-            assert key1 in self.lineages
+            assert key1 in self.lineages, key1
             if key1 not in self.lineage_distance_matrix:
                 self.lineage_distance_matrix[key1] = {}
             for node2 in ndm:
@@ -310,6 +311,7 @@ class HostHistorySamples(object):
                         lineage_end_distribution_bitstring=lineage_d["lineage_end_distribution_bitstring"],
                         is_seed_node=lineage_d["is_seed_node"],
                         is_leaf=lineage_d["is_leaf"],
+                        is_extant_leaf=lineage_d["is_extant_leaf"],
                         )
                 assert lineage.lineage_id not in host_history.lineages
                 assert lineage.lineage_start_time <= lineage.lineage_end_time, "{}, {}".format(lineage.lineage_start_time, lineage.lineage_end_time)
@@ -384,6 +386,7 @@ class HostHistorySamples(object):
                     lineage_end_distribution_bitstring=edge_entry["edge_ending_state"],
                     is_seed_node=edge_entry["is_seed_node"],
                     is_leaf=edge_entry["is_leaf"],
+                    is_extant_leaf=edge_entry["is_leaf"],
                     )
             assert lineage.lineage_id not in tree_host_histories[tree_idx].lineages
             assert lineage.lineage_start_time <= lineage.lineage_end_time, "{}, {}".format(lineage.lineage_start_time, lineage.lineage_end_time)
@@ -464,6 +467,7 @@ class HostLineage(object):
         self.end_distribution_bitstring = host_history_lineage_definition.lineage_end_distribution_bitstring
         self.is_seed_node = host_history_lineage_definition.is_seed_node
         self.is_leaf = host_history_lineage_definition.is_leaf
+        self.is_extant_leaf = host_history_lineage_definition.is_extant_leaf
         self._current_areas = set()
         self.extancy = "pre"
         self.debug_mode = False
@@ -696,6 +700,7 @@ class HostSystem(object):
         self.host_lineages = set()
         self.host_lineages_by_id = {}
         self.leaf_host_lineages = set()
+        self.extant_leaf_host_lineages = set()
         self.seed_host_lineage = None
         for host_history_lineage_id_definition in self.host_history.lineages.values():
             host = HostLineage(
@@ -710,6 +715,8 @@ class HostSystem(object):
                 self.seed_host_lineage = host
             if host.is_leaf:
                 self.leaf_host_lineages.add(host)
+            if host.is_extant_leaf:
+                self.extant_leaf_host_lineages.add(host)
 
         # local copy of host events
         # self.host_events = list(self.host_history.events)
