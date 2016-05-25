@@ -317,8 +317,8 @@ class HostHistorySamples(object):
                 assert lineage.lineage_start_time <= lineage.lineage_end_time, "{}, {}".format(lineage.lineage_start_time, lineage.lineage_end_time)
                 host_history.lineages[lineage.lineage_id] = lineage
             for event_d in history_sample["events"]:
-                if event_d["event_type"] == "extinction":
-                    continue
+                # if event_d["event_type"] == "extinction":
+                #     continue
                 if event_d["event_type"] == "trait_evolution":
                     continue
                 event = HostHistory.HostEvent(
@@ -515,6 +515,11 @@ class HostLineage(object):
         assert area in self._current_areas
         self._current_areas.remove(area)
         area.host_lineages.remove(self)
+
+    def clear_areas(self):
+        for area in self._current_areas:
+            area.host_lineages.remove(self)
+        self._current_areas.clear()
 
     def has_area(self, area):
         return area in self._current_areas

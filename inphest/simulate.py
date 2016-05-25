@@ -479,7 +479,19 @@ class InphestSimulator(object):
                         self.phylogeny.extinguish_lineage(symbiont_lineage)
             host_lineage.remove_area(area)
         elif host_event.event_type == "extinction":
-            assert False
+            # print(host_lineage._current_areas)
+            # for area in host_lineage._current_areas:
+            #     assert host_lineage in area.host_lineages
+            if self.debug_mode:
+                self.run_logger.debug("Host lineage {}: extinction")
+            for symbiont_lineage in self.phylogeny.current_lineage_iter():
+                if symbiont_lineage.has_host(host_lineage):
+                    try:
+                        symbiont_lineage.remove_host(host_lineage)
+                    except model.SymbiontLineage.NullDistributionException:
+                        self.phylogeny.extinguish_lineage(symbiont_lineage)
+            host_lineage.clear_areas()
+            self.deactivate_host_lineage(host_lineage)
         elif host_event.event_type == "cladogenesis":
             host_child0_lineage = self.host_system.host_lineages_by_id[host_event.child0_lineage_id]
             self.activate_host_lineage(host_child0_lineage)
