@@ -453,7 +453,6 @@ class InphestSimulator(object):
         return master_event_calls, master_event_rates
 
     def process_host_event(self, host_event):
-        # print(host_event)
         assert host_event not in self.processed_host_events
         host_lineage = self.host_system.host_lineages_by_id[host_event.lineage_id]
         if self.debug_mode:
@@ -482,9 +481,6 @@ class InphestSimulator(object):
                 self.phylogeny.extinguish_lineage(symbiont_lineage)
             host_lineage.remove_area(area)
         elif host_event.event_type == "extinction":
-            # print(host_lineage._current_areas)
-            # for area in host_lineage._current_areas:
-            #     assert host_lineage in area.host_lineages
             if self.debug_mode:
                 self.run_logger.debug("Host lineage {}: extinction")
             symbiont_lineages_to_remove = []
