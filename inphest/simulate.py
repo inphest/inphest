@@ -471,12 +471,15 @@ class InphestSimulator(object):
                 host_lineage._current_distribution_check_bitlist[host_event.area_idx] = "0"
                 self.run_logger.debug("Host lineage {}: anagenetic loss of area with index {}: {}".format(host_lineage.lineage_id, host_event.area_idx, host_lineage._current_distribution_check_bitlist))
             area = self.host_system.areas[host_event.area_idx]
+            symbiont_lineages_to_remove = []
             for symbiont_lineage in self.phylogeny.current_lineage_iter():
                 if symbiont_lineage.has_host_in_area(host_lineage, area):
                     try:
                         symbiont_lineage.remove_host_in_area(host_lineage, area)
                     except model.SymbiontLineage.NullDistributionException:
-                        self.phylogeny.extinguish_lineage(symbiont_lineage)
+                        symbiont_lineages_to_remove.append(symbiont_lineage)
+            for symbiont_lineage in symbiont_lineages_to_remove:
+                self.phylogeny.extinguish_lineage(symbiont_lineage)
             host_lineage.remove_area(area)
         elif host_event.event_type == "extinction":
             # print(host_lineage._current_areas)
@@ -484,8 +487,8 @@ class InphestSimulator(object):
             #     assert host_lineage in area.host_lineages
             if self.debug_mode:
                 self.run_logger.debug("Host lineage {}: extinction")
+            symbiont_lineages_to_remove = []
             for symbiont_lineage in self.phylogeny.current_lineage_iter():
-                symbiont_lineages_to_remove = []
                 if symbiont_lineage.has_host(host_lineage):
                     try:
                         symbiont_lineage.remove_host(host_lineage)
