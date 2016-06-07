@@ -485,11 +485,14 @@ class InphestSimulator(object):
             if self.debug_mode:
                 self.run_logger.debug("Host lineage {}: extinction")
             for symbiont_lineage in self.phylogeny.current_lineage_iter():
+                symbiont_lineages_to_remove = []
                 if symbiont_lineage.has_host(host_lineage):
                     try:
                         symbiont_lineage.remove_host(host_lineage)
                     except model.SymbiontLineage.NullDistributionException:
-                        self.phylogeny.extinguish_lineage(symbiont_lineage)
+                        symbiont_lineages_to_remove.append(symbiont_lineage)
+            for symbiont_lineage in symbiont_lineages_to_remove:
+                self.phylogeny.extinguish_lineage(symbiont_lineage)
             host_lineage.clear_areas()
             self.deactivate_host_lineage(host_lineage)
         elif host_event.event_type == "cladogenesis":

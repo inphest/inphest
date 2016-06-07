@@ -764,7 +764,7 @@ class SymbiontLineage(dendropy.Node):
     """
 
     class NullDistributionException(Exception):
-        def __init__(lineage):
+        def __init__(self, lineage):
             self.lineage = lineage
 
     def __init__(self, index, host_system):
