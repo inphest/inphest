@@ -292,7 +292,7 @@ class InphestSimulator(object):
             try:
                 event_f(**event_kwargs)
             except model.SymbiontLineage.NullDistributionException as lineage_null_distribution_exception:
-                self.phylogeny.extinction_rate(symbiont_lineage=lineage_null_distribution_exception.lineage)
+                self.phylogeny.extinguish_lineage(symbiont_lineage=lineage_null_distribution_exception.lineage)
 
             ### DEBUG
             if self.debug_mode:
