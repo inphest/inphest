@@ -24,6 +24,8 @@ from inphest import error
 
 class InphestSimulator(object):
 
+    DEFAULT_SUMMARY_STATS_DELIMITER = ","
+
     @staticmethod
     def get_fixed_value_function(v, description):
         f = lambda x: v
@@ -34,13 +36,19 @@ class InphestSimulator(object):
     def compose_trees_filepath(output_prefix):
         return output_prefix + ".trees"
 
-    # @staticmethod
-    # def compose_focal_areas_trees_filepath(output_prefix):
-    #     return output_prefix + ".focal-areas.trees"
+    @staticmethod
+    def compose_summary_stats_filepath(output_prefix):
+        return output_prefix + ".summary-stats.csv"
 
-    # @staticmethod
-    # def compose_all_areas_trees_filepath(output_prefix):
-    #     return output_prefix + ".all-areas.trees"
+    @staticmethod
+    def open_summary_stats_file(output_prefix):
+        summary_stats_file = open(InphestSimulator.compose_summary_stats_filepath(output_prefix), "w")
+        header = [
+            "model.id",
+            ]
+        summary_stats_file.write(InphestSimulator.DEFAULT_SUMMARY_STATS_DELIMITER.join(header))
+        summary_stats_file.write("\n")
+        return summary_stats_file
 
     @staticmethod
     def simple_node_label_function(node):
@@ -135,6 +143,14 @@ class InphestSimulator(object):
                 self.run_logger.info("Host associations and geographical ranges will be annotated on node labels")
             else:
                 self.run_logger.info("Host associations and geographical ranges will NOT be annotated on node labels")
+
+        self.is_process_summary_stats = config_d.pop("store_summary_stats", True)
+        if self.is_process_summary_stats:
+            self.summary_stats_file = config_d.pop("summary_stats_file", None)
+            if self.summary_stats_file is None:
+                self.summary_stats_file = InphestSimulator.open_summary_stats_file(self.output_prefix)
+            if verbose:
+                self.run_logger.info("Summary statistics filepath: {}".format(self.summary_stats_file.name))
 
         self.rng = config_d.pop("rng", None)
         if self.rng is None:
@@ -302,18 +318,6 @@ class InphestSimulator(object):
                 for lineage in self.phylogeny.current_lineages:
                     assert lineage.is_extant
                     lineage.debug_check(simulation_elapsed_time=self.elapsed_time)
-
-            # if self.model.gsa_termination_focal_area_lineages and ntips_in_focal_areas >= self.model.gsa_termination_focal_area_lineages:
-            #     # select/process one of the previously stored snapshots, write to final results file,
-            #     # and then break
-            #     raise NotImplementedError
-            # elif self.model.gsa_termination_focal_area_lineages and ntips_in_focal_areas == self.target_focal_area_lineages:
-            #     # store snapshot in log, but do not break
-            #     raise NotImplementedError
-            # elif self.model.target_focal_area_lineages and ntips_in_focal_areas >= self.model.target_focal_area_lineages:
-            #     self.run_logger.info("Termination condition of {} lineages in focal areas reached at t = {}: storing results and terminating".format(self.model.target_focal_area_lineages, self.elapsed_time))
-            #     self.store_sample(trees_file=self.trees_file)
-            #     break
 
     def schedule_events(self):
         event_fluxes = {}
@@ -552,10 +556,15 @@ class InphestSimulator(object):
         self.processed_host_events.add(host_event)
 
     def store_sample(self, trees_file):
+        if self.is_process_summary_stats:
+            self.calculate_and_store_summary_stats()
         self.write_tree(
                 out=trees_file,
                 tree=self.phylogeny,
                 )
+
+    def calculate_and_store_summary_stats(self):
+        pass
 
     def write_tree(self, out, tree):
         if self.is_encode_nodes:
@@ -708,6 +717,8 @@ def repeat_run(
         run_logger.info("-inphest- Using existing RNG: {}".format(config_d["rng"]))
     if config_d.get("store_trees", True) and "trees_file" not in config_d:
         config_d["trees_file"] = open(InphestSimulator.compose_trees_filepath(output_prefix), "w")
+    if config_d.get("store_summary_stats", True) and "summary_stats_file" not in config_d:
+        config_d["summary_stats_file"] = InphestSimulator.open_summary_stats_file(output_prefix)
 
     host_history_samples_path = os.path.normpath(host_history_samples_path)
     run_logger.info("-inphest- Using host biogeographical regime samples from: {}".format(host_history_samples_path))
