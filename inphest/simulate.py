@@ -368,7 +368,10 @@ class InphestSimulator(object):
                                     to_host_lineage=dest_host,
                                     area=area,
                                     num_potential_new_host_infection_events=num_potential_new_host_infection_events,
-                                    simulation_elapsed_time=self.elapsed_time)
+                                    simulation_elapsed_time=self.elapsed_time,
+                                    symbiont_tree=self.phylogeny,
+                                    host_system=self.host_system,
+                                    )
                             if rate:
                                 transmission_event_calls.append( (lineage.add_host_in_area,  {"host_lineage": dest_host, "area": area,}) )
                                 transmission_event_rates.append(rate)

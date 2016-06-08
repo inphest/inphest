@@ -231,7 +231,7 @@ class HostHistory(object):
             for node2 in ndm:
                 key2 = int(node2.edge.bipartition.split_bitmask)
                 assert key2 in self.lineages
-                self.lineage_distance_matrix[key1][key2] = ndm.patristic_distance(node1, node2)
+                self.lineage_distance_matrix[key1][key2] = ndm.patristic_distance(node1, node2, is_normalize_by_tree_size=True)
         self.start_time = start_time
         self.end_time = end_time
         self.events.sort(key=lambda x: x.event_time, reverse=False)
@@ -673,6 +673,8 @@ class HostSystem(object):
 
     def compile(self, host_history, host_to_symbiont_time_scale_factor, debug_mode=False):
         self.host_history = host_history
+        self.host_tree = self.host_history.tree
+        self.host_lineage_distance_matrix = self.host_history.lineage_distance_matrix
         self.host_to_symbiont_time_scale_factor = host_to_symbiont_time_scale_factor
         self.start_time = self.host_history.start_time * self.host_to_symbiont_time_scale_factor
         self.end_time = self.host_history.end_time * self.host_to_symbiont_time_scale_factor
