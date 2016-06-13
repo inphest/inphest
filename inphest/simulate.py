@@ -45,11 +45,6 @@ class InphestSimulator(object):
     @staticmethod
     def open_summary_stats_file(output_prefix):
         summary_stats_file = open(InphestSimulator.compose_summary_stats_filepath(output_prefix), "w")
-        # header = [
-        #     "model.id",
-        #     ]
-        # summary_stats_file.write(InphestSimulator.DEFAULT_SUMMARY_STATS_DELIMITER.join(header))
-        # summary_stats_file.write("\n")
         return summary_stats_file
 
     @staticmethod
@@ -153,6 +148,9 @@ class InphestSimulator(object):
             self.summary_stats_file = config_d.pop("summary_stats_file", None)
             if self.summary_stats_file is None:
                 self.summary_stats_file = InphestSimulator.open_summary_stats_file(self.output_prefix)
+                self.is_summary_stats_header_written = False
+            else:
+                self.is_summary_stats_header_written = config_d.pop("is_summary_stats_header_written", False)
             if verbose:
                 self.run_logger.info("Summary statistics filepath: {}".format(self.summary_stats_file.name))
 
@@ -574,6 +572,11 @@ class InphestSimulator(object):
                     host_system=self.host_system)
         except dendropy_error.NullLeafSetException:
             raise error.TotalExtinctionException()
+        if not self.is_summary_stats_header_written:
+            header = ["model.id"] + ss.keys()
+            self.summary_stats_file.write(",".join(header))
+            self.summary_stats_file.write("\n")
+            self.is_summary_stats_header_written = True
         self.summary_stats_file.write("{},".format(self.model.model_id))
         self.summary_stats_file.write(",".join("{}".format(ss[k]) for k in ss))
         self.summary_stats_file.write("\n")
@@ -760,6 +763,7 @@ def repeat_run(
             while True:
                 if num_restarts == 0 and current_rep == 0:
                     is_verbose_setup = True
+                    config_d["is_summary_stats_header_written"] = False
                     model_setup_logger = run_logger
                 else:
                     is_verbose_setup = False
@@ -785,6 +789,7 @@ def repeat_run(
                     )
                 try:
                     inphest_simulator.run()
+                    config_d["is_summary_stats_header_written"] = True
                     run_logger.system = None
                 except error.InphestException as e:
                     run_logger.system = None
