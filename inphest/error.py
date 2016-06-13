@@ -11,3 +11,4 @@ class InsufficientFocalAreaLineagesSimulationException(FailedSimulationException
 
 class TotalExtinctionException(FailedSimulationException):
     pass
+

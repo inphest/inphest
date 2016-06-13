@@ -45,11 +45,11 @@ class InphestSimulator(object):
     @staticmethod
     def open_summary_stats_file(output_prefix):
         summary_stats_file = open(InphestSimulator.compose_summary_stats_filepath(output_prefix), "w")
-        header = [
-            "model.id",
-            ]
-        summary_stats_file.write(InphestSimulator.DEFAULT_SUMMARY_STATS_DELIMITER.join(header))
-        summary_stats_file.write("\n")
+        # header = [
+        #     "model.id",
+        #     ]
+        # summary_stats_file.write(InphestSimulator.DEFAULT_SUMMARY_STATS_DELIMITER.join(header))
+        # summary_stats_file.write("\n")
         return summary_stats_file
 
     @staticmethod
@@ -573,7 +573,10 @@ class InphestSimulator(object):
                     symbiont_phylogeny=self.phylogeny,
                     host_system=self.host_system)
         except dendropy_error.NullLeafSetException:
-            error.TotalExtinctionException("Not all areas occupied by symbiont lineage")
+            raise error.TotalExtinctionException()
+        self.summary_stats_file.write("{},".format(self.model.model_id))
+        self.summary_stats_file.write(",".join("{}".format(ss[k]) for k in ss))
+        self.summary_stats_file.write("\n")
 
     def write_tree(self, out, tree):
         if self.is_encode_nodes:
