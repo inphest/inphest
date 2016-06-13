@@ -223,11 +223,23 @@ class HostHistory(object):
         self.tree = tree
         ndm = self.tree.node_distance_matrix()
         self.lineage_distance_matrix = {}
+        self.area_assemblage_leaf_sets = None
         for node1 in ndm:
             key1 = int(node1.edge.bipartition.split_bitmask)
             assert key1 in self.lineages, key1
             if key1 not in self.lineage_distance_matrix:
                 self.lineage_distance_matrix[key1] = {}
+                node1.lineage_definition = self.lineages[key1]
+                if node1.lineage_definition.is_extant_leaf:
+                    for idx, presence in enumerate(node1.lineage_definition.lineage_end_distribution_bitstring):
+                        if self.area_assemblage_leaf_sets is None:
+                            self.area_assemblage_leaf_sets = [set() for i in range(len(node1.lineage_definition.lineage_end_distribution_bitstring))]
+                        else:
+                            assert len(self.area_assemblage_leaf_sets) == len(node1.lineage_definition.lineage_end_distribution_bitstring)
+                        if presence == "1":
+                            self.area_assemblage_leaf_sets[idx].add(node1)
+                        else:
+                            assert presence == "0"
             for node2 in ndm:
                 key2 = int(node2.edge.bipartition.split_bitmask)
                 assert key2 in self.lineages
@@ -268,6 +280,19 @@ class HostHistory(object):
                     distribution_bitlist[event.area_idx] == "0"
                 elif event.event_type == "cladogenesis":
                     assert "".join(distribution_bitlist) == self.lineages[lineage_id].lineage_start_distribution_bitstring
+
+    def generate_areas(self):
+        num_areas = None
+        for host_history_lineage_id_definition in self.lineages.values():
+            if num_areas is None:
+                num_areas = len(host_history_lineage_id_definition.lineage_start_distribution_bitstring)
+            assert num_areas == len(host_history_lineage_id_definition.lineage_start_distribution_bitstring)
+            assert num_areas == len(host_history_lineage_id_definition.lineage_end_distribution_bitstring),  "{}: {}".format(num_areas, host_history_lineage_id_definition.lineage_end_distribution_bitstring)
+        areas = []
+        for area_idx in range(num_areas):
+            area = Area(area_idx)
+            areas.append(area)
+        return areas
 
 class HostHistorySamples(object):
     """
@@ -529,7 +554,8 @@ class HostLineage(object):
             yield area
 
     def debug_check(self, simulation_elapsed_time):
-        self.debug_check_extancy_state(simulation_elapsed_time)
+        if simulation_elapsed_time is not None:
+            self.debug_check_extancy_state(simulation_elapsed_time)
         self.debug_check_distribution(simulation_elapsed_time=simulation_elapsed_time)
 
     def assert_correctly_extant(self, simulation_elapsed_time, ignore_fail=False):
@@ -678,24 +704,10 @@ class HostSystem(object):
         self.host_to_symbiont_time_scale_factor = host_to_symbiont_time_scale_factor
         self.start_time = self.host_history.start_time * self.host_to_symbiont_time_scale_factor
         self.end_time = self.host_history.end_time * self.host_to_symbiont_time_scale_factor
-        num_areas = None
 
         # build areas
-        for host_history_lineage_id_definition in self.host_history.lineages.values():
-            if num_areas is None:
-                num_areas = len(host_history_lineage_id_definition.lineage_start_distribution_bitstring)
-            # print("{}: ({}) {} => {}".format(
-            #         host_history_lineage_id_definition.lineage_id,
-            #         num_areas,
-            #         host_history_lineage_id_definition.lineage_start_distribution_bitstring,
-            #         host_history_lineage_id_definition.lineage_end_distribution_bitstring))
-            assert num_areas == len(host_history_lineage_id_definition.lineage_start_distribution_bitstring)
-            assert num_areas == len(host_history_lineage_id_definition.lineage_end_distribution_bitstring),  "{}: {}".format(num_areas, host_history_lineage_id_definition.lineage_end_distribution_bitstring)
-        self.num_areas = num_areas
-        self.areas = []
-        for area_idx in range(self.num_areas):
-            area = Area(area_idx)
-            self.areas.append(area)
+        self.areas = self.host_history.generate_areas()
+        self.num_areas = len(self.areas)
 
         # self.area_host_symbiont_host_area_distribution = {}
         # for area in self.areas:

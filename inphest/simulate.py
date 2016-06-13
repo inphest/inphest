@@ -16,8 +16,10 @@ from distutils.util import strtobool
 
 import dendropy
 from dendropy.utility import textprocessing
+from dendropy.utility import error as dendropy_error
 
 import inphest
+from inphest import summarize
 from inphest import model
 from inphest import utility
 from inphest import error
@@ -58,12 +60,14 @@ class InphestSimulator(object):
             inphest_model,
             host_history,
             config_d,
-            is_verbose_setup):
+            is_verbose_setup,
+            summary_stats_calculator):
 
         # configure
         self.elapsed_time = 0.0 # need to be here for logging
         config_d = dict(config_d) # make copy so we can pop items
         self.configure_simulator(config_d, verbose=is_verbose_setup)
+        self.summary_stats_calculator = summary_stats_calculator
 
         # set up model
         self.model = inphest_model
@@ -564,7 +568,12 @@ class InphestSimulator(object):
                 )
 
     def calculate_and_store_summary_stats(self):
-        pass
+        try:
+            ss = self.summary_stats_calculator.calculate(
+                    symbiont_phylogeny=self.phylogeny,
+                    host_system=self.host_system)
+        except dendropy_error.NullLeafSetException:
+            error.TotalExtinctionException("Not all areas occupied by symbiont lineage")
 
     def write_tree(self, out, tree):
         if self.is_encode_nodes:
@@ -730,12 +739,21 @@ def repeat_run(
     run_logger.info("-inphest- {} host biogeographical regime samples found in source".format(len(hrs.host_histories), host_history_samples_path))
 
     current_rep = 0
+    summary_stats_calculators = {}
     while current_rep < nreps:
         for host_history_idx, host_history in enumerate(hrs.host_histories):
             simulation_name="Run_{}_{}".format(current_rep+1, host_history_idx+1)
             run_output_prefix = "{}.R{:04d}.H{:04d}".format(output_prefix, current_rep+1, host_history_idx+1)
             run_logger.info("-inphest- Replicate {} of {}, host regime {} of {}: Starting".format(current_rep+1, nreps, host_history_idx+1, len(hrs.host_histories)))
             num_restarts = 0
+            try:
+                summary_stats_calculator = summary_stats_calculators[host_history]
+            except KeyError:
+                summary_stats_calculator = summarize.SummaryStatsCalculator(
+                        host_history=host_history,
+                        debug_mode=debug_mode,
+                        )
+                summary_stats_calculators[host_history] = summary_stats_calculator
             while True:
                 if num_restarts == 0 and current_rep == 0:
                     is_verbose_setup = True
@@ -760,6 +778,7 @@ def repeat_run(
                     host_history=host_history,
                     config_d=config_d,
                     is_verbose_setup=is_verbose_setup,
+                    summary_stats_calculator=summary_stats_calculator,
                     )
                 try:
                     inphest_simulator.run()
