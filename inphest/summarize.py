@@ -256,7 +256,7 @@ class SummaryStatsCalculator(object):
             is_exchangeable_assemblage_classifications=True,
             default_value_for_missing_comparisons=False,
             ))
-        for induced_tree in symbiont_area_assemblage_trees:
+        for induced_tree in symbiont_host_assemblage_trees:
             self.tree_shape_kernel.remove_from_cache(induced_tree)
 
         self.restore_tree(symbiont_phylogeny, old_taxon_namespace)
