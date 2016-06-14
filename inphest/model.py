@@ -533,8 +533,6 @@ class HostLineage(object):
             area.host_lineages.remove(self)
         self._current_areas = set()
         self.extancy = "post"
-        if self.lineage_id == 524288:
-            assert False
 
     def add_area(self, area):
         assert area not in self._current_areas
