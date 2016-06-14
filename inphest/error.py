@@ -6,12 +6,18 @@ class InphestException(Exception):
 class FailedSimulationException(InphestException):
     pass
 
-class InsufficientFocalAreaLineagesSimulationException(FailedSimulationException):
+class PostTerminationFailedSimulationException(FailedSimulationException):
     pass
 
-class IncompleteHostOccupancyException(FailedSimulationException):
+class PreTerminationFailedSimulationException(FailedSimulationException):
     pass
 
-class TotalExtinctionException(FailedSimulationException):
+class IncompleteAreaOccupancyException(PostTerminationFailedSimulationException):
+    pass
+
+class IncompleteHostOccupancyException(PostTerminationFailedSimulationException):
+    pass
+
+class TotalExtinctionException(PreTerminationFailedSimulationException):
     pass
 

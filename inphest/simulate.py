@@ -300,8 +300,9 @@ class InphestSimulator(object):
                 self.elapsed_time = self.max_time
                 assert len(self.processed_host_events) == len(self.host_system.host_history.events)
                 assert len(self.host_system.host_events) == 0
-                self.run_logger.info("Termination condition of t = {} reached: storing results and terminating".format(self.elapsed_time))
+                self.run_logger.info("Termination condition of t = {} reached: calculating summary statistics".format(self.elapsed_time))
                 self.store_sample(trees_file=self.trees_file)
+                self.run_logger.info("Summary statistics and trees stored")
                 break
             for lineage in self.phylogeny.current_lineage_iter():
                 lineage.edge.length += time_till_event
@@ -800,7 +801,12 @@ def repeat_run(
                     run_logger.system = None
                 except error.InphestException as e:
                     run_logger.system = None
-                    run_logger.info("-inphest- Replicate {} of {}, host regime {} of {}: Simulation failure before termination condition at t = {}: {}".format(current_rep+1, nreps, host_history_idx+1, len(hrs.host_histories), inphest_simulator.elapsed_time, e))
+                    if isinstance(e, error.PreTerminationFailedSimulationException):
+                        run_logger.info("-inphest- Replicate {} of {}, host regime {} of {}: Simulation failure before termination condition at t = {}: {}".format(current_rep+1, nreps, host_history_idx+1, len(hrs.host_histories), inphest_simulator.elapsed_time, e))
+                    elif isinstance(e, error.PostTerminationFailedSimulationException):
+                        run_logger.info("-inphest- Replicate {} of {}, host regime {} of {}: Post-simulation failure: {}".format(current_rep+1, nreps, host_history_idx+1, len(hrs.host_histories), e))
+                    else:
+                        run_logger.info("-inphest- Replicate {} of {}, host regime {} of {}: Simulation failure: {}".format(current_rep+1, nreps, host_history_idx+1, len(hrs.host_histories), e))
                     num_restarts += 1
                     if num_restarts > maximum_num_restarts_per_replicates:
                         run_logger.info("-inphest- Replicate {} of {}, host regime {} of {}: Maximum number of restarts exceeded: aborting".format(current_rep+1, nreps, host_history_idx+1, len(hrs.host_histories)))

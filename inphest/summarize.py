@@ -173,7 +173,7 @@ class SummaryStatsCalculator(object):
             if len(assemblage_leaf_set) == 0:
                 if skip_null_assemblages:
                     continue
-                raise error.InsufficientFocalAreaLineagesSimulationException()
+                raise error.PostTerminationFailedSimulationException("null assemblage set")
             node_filter_fn = lambda nd: nd in assemblage_leaf_set
             induced_tree = tree.extract_tree(
                                node_filter_fn=node_filter_fn,
@@ -219,7 +219,7 @@ class SummaryStatsCalculator(object):
                 raise error.IncompleteHostOccupancyException("incomplete host occupancy")
         if not self.ignore_incomplete_area_occupancies:
             if set() in symbiont_phylogeny_leaf_sets_by_area:
-                raise error.InsufficientFocalAreaLineagesSimulationException("incomplete area occupancy")
+                raise error.IncompleteAreaOccupancyException("incomplete area occupancy")
 
         ## main trees kernel trick
         results = collections.OrderedDict()
