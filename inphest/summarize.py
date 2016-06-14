@@ -188,37 +188,46 @@ class SummaryStatsCalculator(object):
         self.is_exchangeable_areas = True
         self.skip_null_symbiont_area_assemblages = True # If `False` requires all areas to have at least on symbiont lineage
         self.debug_mode = debug_mode
+        self.ignore_incomplete_host_occupancies = False
+        self.ignore_incomplete_area_occupancies = False
         self.bind_to_host_history(host_history)
         self.tree_shape_kernel = treecompare.TreeShapeKernel()
 
     def bind_to_host_history(self, host_history):
         self.host_history = host_history
         self.host_tree = host_history.tree
-        # # Note this order will vary from run to run (because `host_system.extant_host_leaf_lineages` is a set).
-        # # Also note that we assume here that this calculation occurs at the end of the run; must use `extant_host_lineages_at_current_time` if not.
-        # self.current_host_leaf_lineages = list(self.host_history.extant_leaf_lineages)
         self.host_area_assemblage_trees = self.generate_induced_trees(
                 tree=self.host_tree,
                 assemblage_leaf_sets=self.host_history.area_assemblage_leaf_sets,
                 skip_null_assemblages=False)
 
-    def calculate(self, symbiont_phylogeny, host_system):
+    def calculate(self, symbiont_phylogeny, host_system, simulation_elapsed_time):
         old_taxon_namespace = self.preprocess_tree(symbiont_phylogeny)
 
+        current_host_leaf_lineages = list(host_system.extant_host_lineages_at_current_time(simulation_elapsed_time))
         symbiont_phylogeny_leaf_sets_by_area = [set() for i in range(host_system.num_areas)]
-        # symbiont_phylogeny_leaf_sets_by_host = [set() for i in self.extant_host_leaf_lineages]
+        symbiont_phylogeny_leaf_sets_by_host = [set() for i in current_host_leaf_lineages]
         for symbiont_lineage in symbiont_phylogeny.leaf_node_iter():
             for area in symbiont_lineage.area_iter():
                 symbiont_phylogeny_leaf_sets_by_area[area.area_idx].add(symbiont_lineage)
-            # for host_idx, host in enumerate(self.extant_host_leaf_lineages):
-            #     if symbiont_lineage.has_host(host_system.host_lineages_by_id[host.lineage_definition.lineage_id]):
-            #         symbiont_phylogeny_leaf_sets_by_host[host_idx].add(symbiont_lineage)
+            for host_idx, host_lineage in enumerate(current_host_leaf_lineages):
+                # if symbiont_lineage.has_host(host_system.host_lineages_by_id[host.lineage_definition.lineage_id]):
+                if symbiont_lineage.has_host(host_lineage):
+                    symbiont_phylogeny_leaf_sets_by_host[host_idx].add(symbiont_lineage)
+        if not self.ignore_incomplete_host_occupancies:
+            if set() in symbiont_phylogeny_leaf_sets_by_host:
+                raise error.IncompleteHostOccupancyException("incomplete host occupancy")
+        if not self.ignore_incomplete_area_occupancies:
+            if set() in symbiont_phylogeny_leaf_sets_by_area:
+                raise error.InsufficientFocalAreaLineagesSimulationException("incomplete area occupancy")
 
+        ## main trees kernel trick
         results = collections.OrderedDict()
-        results["predictor.primary.tree.ktd"] = self.tree_shape_kernel(
+        results["predictor.primary.tree.tsktd"] = self.tree_shape_kernel(
                 tree1=self.host_tree,
                 tree2=symbiont_phylogeny)
 
+        ## area trees kernel trick
         symbiont_area_assemblage_trees = self.generate_induced_trees(
                 tree=symbiont_phylogeny,
                 assemblage_leaf_sets=symbiont_phylogeny_leaf_sets_by_area,
@@ -226,37 +235,31 @@ class SummaryStatsCalculator(object):
         results.update(self.tree_shape_kernel_compare_trees(
             trees1=self.host_area_assemblage_trees,
             trees2=symbiont_area_assemblage_trees,
-            fieldname_prefix="predictor.area.assemblage",
-            fieldname_suffix="tskd",
+            fieldname_prefix="predictor.area.assemblage.tsktd",
+            fieldname_suffix="",
             is_exchangeable_assemblage_classifications=True,
             default_value_for_missing_comparisons=False,
             ))
         for induced_tree in symbiont_area_assemblage_trees:
             self.tree_shape_kernel.remove_from_cache(induced_tree)
 
-#         results.update(self.area_tree_shape_comparator(
-#                 tree1=self.host_history.tree,
-#                 tree2=symbiont_phylogeny,
-#                 tree1_assemblage_leaf_sets=None,
-#                 tree2_assemblage_leaf_sets=symbiont_phylogeny_leaf_sets_by_area,
-#                 is_tree1_cache_updated=True,
-#                 is_tree2_cache_updated=False,
-#                 fieldname_prefix="predictor.area.",
-#                 ))
-#         self.area_tree_shape_comparator.remove_from_cache(symbiont_phylogeny)
+        ## host trees kernel trick
+        symbiont_host_assemblage_trees = self.generate_induced_trees(
+                tree=symbiont_phylogeny,
+                assemblage_leaf_sets=symbiont_phylogeny_leaf_sets_by_host,
+                skip_null_assemblages=False)
+        results.update(self.tree_shape_kernel_compare_trees(
+            trees1=self.host_area_assemblage_trees,
+            trees2=symbiont_host_assemblage_trees,
+            fieldname_prefix="predictor.host.assemblage.tsktd",
+            fieldname_suffix="",
+            is_exchangeable_assemblage_classifications=True,
+            default_value_for_missing_comparisons=False,
+            ))
+        for induced_tree in symbiont_area_assemblage_trees:
+            self.tree_shape_kernel.remove_from_cache(induced_tree)
 
-#         # print([len(s) for s in symbiont_phylogeny_leaf_sets_by_host])
-#         results.update(self.host_tree_shape_comparator(
-#                 tree1=self.host_history.tree,
-#                 tree2=symbiont_phylogeny,
-#                 tree1_assemblage_leaf_sets=None,
-#                 tree2_assemblage_leaf_sets=symbiont_phylogeny_leaf_sets_by_host,
-#                 is_tree1_cache_updated=True,
-#                 is_tree2_cache_updated=False,
-#                 fieldname_prefix="predictor.host.",
-#                 ))
-#         self.host_tree_shape_comparator.remove_from_cache(symbiont_phylogeny)
-#         self.restore_tree(symbiont_phylogeny, old_taxon_namespace)
+        self.restore_tree(symbiont_phylogeny, old_taxon_namespace)
         return results
 
     def tree_shape_kernel_compare_trees(self,

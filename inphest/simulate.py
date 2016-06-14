@@ -466,14 +466,19 @@ class InphestSimulator(object):
         host_lineage = self.host_system.host_lineages_by_id[host_event.lineage_id]
         if self.debug_mode:
             host_lineage.debug_check(simulation_elapsed_time=self.elapsed_time)
-        if host_event.event_type == "anagenesis" and host_event.event_subtype == "area_gain":
+        if host_event.event_type == "geography_anagenesis" and host_event.event_subtype == "area_gain":
             if self.debug_mode:
-                assert host_lineage._current_distribution_check_bitlist[host_event.area_idx] == "0"
+                if not host_lineage.is_seed_node or (host_lineage.is_seed_node and host_lineage.is_post_area_gain):
+                    assert host_lineage._current_distribution_check_bitlist[host_event.area_idx] == "0", "'{}' has value '{}' at index {}".format(host_lineage.lineage_id, host_lineage._current_distribution_check_bitlist[host_event.area_idx], host_event.area_idx)
                 host_lineage._current_distribution_check_bitlist[host_event.area_idx] = "1"
                 self.run_logger.debug("Host lineage {}: anagenetic gain of area with index {}: {}".format(host_lineage.lineage_id, host_event.area_idx, host_lineage._current_distribution_check_bitlist))
             area = self.host_system.areas[host_event.area_idx]
-            host_lineage.add_area(area)
-        elif host_event.event_type == "anagenesis" and host_event.event_subtype == "area_loss":
+            if not host_lineage.is_seed_node or (host_lineage.is_seed_node and host_lineage.is_post_area_gain):
+                host_lineage.add_area(area)
+            else:
+                assert host_lineage.has_area(area)
+            host_lineage.is_post_area_gain = True
+        elif host_event.event_type == "geography_anagenesis" and host_event.event_subtype == "area_loss":
             if self.debug_mode:
                 assert host_lineage._current_distribution_check_bitlist[host_event.area_idx] == "1"
                 host_lineage._current_distribution_check_bitlist[host_event.area_idx] = "0"
@@ -536,11 +541,12 @@ class InphestSimulator(object):
                 # symbiont lineages will be assigned to the host at all.
 
                 # if self.debug_mode:
+                #     print("--- Event: {} ({})".format(host_event.event_type, host_event.event_subtype))
                 #     for area in lineage_areas_with_host:
                 #         if not ( host_child0_lineage.has_area(area) or host_child1_lineage.has_area(area) ):
-                #             print("Host {:5}, {:10}: {}".format(host_lineage.rb_index, host_lineage.leafset_bitstring, sorted( "{:03}".format(a.area_idx) for a in host_lineage.current_area_iter() )))
-                #             print(" Ch0 {:5}, {:10}: {}".format(host_child0_lineage.rb_index, host_child0_lineage.leafset_bitstring, sorted( "{:03}".format(a.area_idx) for a in host_child0_lineage.current_area_iter() )))
-                #             print(" Ch1 {:5}, {:10}: {}".format(host_child1_lineage.rb_index, host_child1_lineage.leafset_bitstring, sorted( "{:03}".format(a.area_idx) for a in host_child1_lineage.current_area_iter() )))
+                #             print("Host {:5}, {:10}: {}".format(host_lineage.lineage_id, host_lineage.leafset_bitstring, sorted( "{:03}".format(a.area_idx) for a in host_lineage.current_area_iter() )))
+                #             print(" Ch0 {:5}, {:10}: {}".format(host_child0_lineage.lineage_id, host_child0_lineage.leafset_bitstring, sorted( "{:03}".format(a.area_idx) for a in host_child0_lineage.current_area_iter() )))
+                #             print(" Ch1 {:5}, {:10}: {}".format(host_child1_lineage.lineage_id, host_child1_lineage.leafset_bitstring, sorted( "{:03}".format(a.area_idx) for a in host_child1_lineage.current_area_iter() )))
                 #             print("Symb {}".format(sorted( "{:03}".format(a.area_idx) for a in symbiont_lineage.areas_in_host_iter(host_lineage) )))
 
                 for ch_lineage in (host_child0_lineage, host_child1_lineage):
@@ -551,6 +557,8 @@ class InphestSimulator(object):
                 assert hosts_in_areas_added > 0
                 symbiont_lineage.remove_host(host_lineage)
             self.deactivate_host_lineage(host_lineage)
+        else:
+            raise ValueError("Unrecognized event type: '{}'".format(host_event.event_type))
 
         if self.debug_mode:
             host_lineage.debug_check(simulation_elapsed_time=self.elapsed_time)
@@ -566,12 +574,10 @@ class InphestSimulator(object):
                 )
 
     def calculate_and_store_summary_stats(self):
-        try:
-            ss = self.summary_stats_calculator.calculate(
-                    symbiont_phylogeny=self.phylogeny,
-                    host_system=self.host_system)
-        except dendropy_error.NullLeafSetException:
-            raise error.TotalExtinctionException()
+        ss = self.summary_stats_calculator.calculate(
+                symbiont_phylogeny=self.phylogeny,
+                host_system=self.host_system,
+                simulation_elapsed_time=self.elapsed_time)
         if not self.is_summary_stats_header_written:
             header = ["model.id"] + ss.keys()
             self.summary_stats_file.write(",".join(header))
@@ -580,6 +586,7 @@ class InphestSimulator(object):
         self.summary_stats_file.write("{},".format(self.model.model_id))
         self.summary_stats_file.write(",".join("{}".format(ss[k]) for k in ss))
         self.summary_stats_file.write("\n")
+        self.summary_stats_file.flush()
 
     def write_tree(self, out, tree):
         if self.is_encode_nodes:

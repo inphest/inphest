@@ -224,7 +224,7 @@ class HostHistory(object):
         ndm = self.tree.node_distance_matrix()
         self.lineage_distance_matrix = {}
         self.area_assemblage_leaf_sets = None
-        self.extant_leaf_lineages = set()
+        self.extant_leaf_nodes = set()
         for node1 in ndm:
             key1 = int(node1.edge.bipartition.split_bitmask)
             assert key1 in self.lineages, key1
@@ -232,7 +232,7 @@ class HostHistory(object):
                 self.lineage_distance_matrix[key1] = {}
                 node1.lineage_definition = self.lineages[key1]
                 if node1.lineage_definition.is_extant_leaf:
-                    self.extant_leaf_lineages.add(node1)
+                    self.extant_leaf_nodes.add(node1)
                     for idx, presence in enumerate(node1.lineage_definition.lineage_end_distribution_bitstring):
                         if self.area_assemblage_leaf_sets is None:
                             self.area_assemblage_leaf_sets = [set() for i in range(len(node1.lineage_definition.lineage_end_distribution_bitstring))]
@@ -525,6 +525,7 @@ class HostLineage(object):
         else:
             self._current_distribution_check_bitlist = None
         self.extancy = "current"
+        self.is_post_area_gain = False
 
     def deactivate(self):
         assert self.extancy == "current"
@@ -532,6 +533,8 @@ class HostLineage(object):
             area.host_lineages.remove(self)
         self._current_areas = set()
         self.extancy = "post"
+        if self.lineage_id == 524288:
+            assert False
 
     def add_area(self, area):
         assert area not in self._current_areas
@@ -656,7 +659,7 @@ class HostLineage(object):
                 assert simulation_elapsed_time <= self.end_time
             elif self.extancy == "post":
                 assert simulation_elapsed_time >= self.start_time
-                assert simulation_elapsed_time >= self.end_time
+                assert abs(simulation_elapsed_time - self.end_time) < 1e-6 or simulation_elapsed_time >= self.end_time, "False: {} >= {}".format(simulation_elapsed_time, self.end_time)
             else:
                 raise ValueError(self.extancy)
             for area in self.host_system.areas:

@@ -9,6 +9,9 @@ class FailedSimulationException(InphestException):
 class InsufficientFocalAreaLineagesSimulationException(FailedSimulationException):
     pass
 
+class IncompleteHostOccupancyException(FailedSimulationException):
+    pass
+
 class TotalExtinctionException(FailedSimulationException):
     pass
 
