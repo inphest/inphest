@@ -90,6 +90,7 @@ class SummaryStatsCalculator(object):
                 tree_phylogenetic_distance_matrix=None,
                 tree_node_distance_matrix=None,
                 tree_id=None,
+                is_skip_normalization_on_zero_division_error=True,
                 )
         return tree_profile
 
