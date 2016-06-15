@@ -118,7 +118,7 @@ class SummaryStatsCalculator(object):
                 if symbiont_lineage.has_host(host_lineage):
                     symbiont_phylogeny_leaf_sets_by_host[host_idx].add(symbiont_lineage)
         if leaf_idx < 2:
-            raise error.InsufficientLineagesGenerated("Generated tree has too few lineages ({})".format(leaf_idx))
+            raise error.InsufficientLineagesGenerated("Generated tree has too few lineages ({})".format(leaf_idx+1))
         if not self.ignore_incomplete_host_occupancies:
             if set() in symbiont_phylogeny_leaf_sets_by_host:
                 raise error.IncompleteHostOccupancyException("incomplete host occupancy")
