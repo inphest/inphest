@@ -84,7 +84,7 @@ class SummaryStatsCalculator(object):
                 is_measure_node_distances=True,
                 is_measure_node_steps=True,
                 is_measure_node_ages=True,
-                is_measure_coalescence_intervals=True,
+                is_measure_coalescence_intervals=False, # artificially imposes requirements that each area/host has at least 2 symbiont lineages
                 is_normalize=True,
                 ultrametricity_precision=constants.DEFAULT_ULTRAMETRICITY_PRECISION,
                 tree_phylogenetic_distance_matrix=None,
