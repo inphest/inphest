@@ -165,6 +165,18 @@ class SummaryStatsCalculator(object):
         for induced_tree in symbiont_host_assemblage_trees:
             self.tree_shape_kernel.remove_from_cache(induced_tree)
 
+        ## host trees vs. area trees kernel trick
+        results.update(self.tree_shape_kernel_compare_trees(
+            trees1=symbiont_area_assemblage_trees,
+            trees2=symbiont_host_assemblage_trees,
+            fieldname_prefix="predictor.host.vs.area.assemblage.tsktd",
+            fieldname_suffix="",
+            is_exchangeable_assemblage_classifications=True,
+            default_value_for_missing_comparisons=False,
+            ))
+        for induced_tree in symbiont_host_assemblage_trees:
+            self.tree_shape_kernel.remove_from_cache(induced_tree)
+
         ## main tree profile distance
         symbiont_tree_profile = self.get_profile_for_tree(tree=symbiont_phylogeny)
         self.compare_profiles(
@@ -173,10 +185,25 @@ class SummaryStatsCalculator(object):
                 fieldname_prefix="predictor.profiledist.main.trees.",
                 fieldname_suffix="",
                 results=results)
+        host_area_assemblage_profiles = [self.get_profile_for_tree(t) for t in self.host_area_assemblage_trees]
+        symbiont_area_assemblage_profiles = [self.get_profile_for_tree(t) for t in symbiont_area_assemblage_trees]
+        symbiont_host_assemblage_profiles = [self.get_profile_for_tree(t) for t in symbiont_host_assemblage_trees]
         self.compare_multi_profiles(
-                profiles1=[self.get_profile_for_tree(t) for t in self.host_area_assemblage_trees],
-                profiles2=[self.get_profile_for_tree(t) for t in symbiont_area_assemblage_trees],
+                profiles1=host_area_assemblage_profiles,
+                profiles2=symbiont_area_assemblage_profiles,
                 fieldname_prefix="predictor.profiledist.area.assemblage.",
+                fieldname_suffix="",
+                results=results)
+        self.compare_multi_profiles(
+                profiles1=host_area_assemblage_profiles,
+                profiles2=symbiont_host_assemblage_profiles,
+                fieldname_prefix="predictor.profiledist.host.assemblage.",
+                fieldname_suffix="",
+                results=results)
+        self.compare_multi_profiles(
+                profiles1=host_area_assemblage_profiles,
+                profiles2=symbiont_host_assemblage_profiles,
+                fieldname_prefix="predictor.profiledist.host.vs.area.assemblage.",
                 fieldname_suffix="",
                 results=results)
 
@@ -200,7 +227,7 @@ class SummaryStatsCalculator(object):
             fieldname_prefix,
             fieldname_suffix,
             results,
-            default_value_for_missing_comparisons="NA",
+            default_value_for_missing_comparisons=False,
             ):
         if len(profiles1) > len(profiles2):
             profiles2, profiles1 = profiles1, profiles2
