@@ -15,127 +15,9 @@ import itertools
 import math
 import dendropy
 from dendropy.calculate import treecompare
+from dendropy.calculate import profiledistance
+from dendropy.utility import constants
 from inphest import error
-
-class AssemblageInducedTreeShapeKernel(treecompare.TreeShapeKernel, treecompare.AssemblageInducedTreeManager):
-
-    @staticmethod
-    def _euclidean_distance(v1, v2, is_weight_values_by_comparison_size=True):
-        v1_size = len(v1)
-        v2_size = len(v2)
-        v1_idx = 0
-        v2_idx = 0
-        if v1_size > v2_size:
-            v1_idx = v1_size - v2_size
-            weight = float(v2_size)
-        elif v2_size > v1_size:
-            v2_idx = v2_size - v1_size
-            weight = float(v1_size)
-        else:
-            weight = float(v1_size)
-        if not is_weight_values_by_comparison_size:
-            weight = 1.0
-        ss = 0.0
-        while v1_idx < v1_size and v2_idx < v2_size:
-            ss += pow(v1[v1_idx]/weight - v2[v2_idx]/weight, 2)
-            v1_idx += 1
-            v2_idx += 1
-        return math.sqrt(ss)
-
-    def __init__(self, *args, **kwargs):
-        self.exchangeable_assemblage_comparison_strategy = kwargs.pop("exchangeable_assemblage_comparison_strategy", "joint minimum")
-        treecompare.TreeShapeKernel.__init__(self, *args, **kwargs)
-        treecompare.AssemblageInducedTreeManager.__init__(self, *args, **kwargs)
-
-    def remove_from_cache(self, tree):
-        for induced_tree in self._tree_assemblage_induced_trees_map[tree]:
-            treecompare.TreeShapeKernel.remove_from_cache(self, induced_tree)
-        treecompare.TreeShapeKernel.remove_from_cache(self, tree)
-        treecompare.AssemblageInducedTreeManager.remove_from_cache(self, tree)
-
-    def update_assemblage_induced_tree_cache(self,
-            tree,
-            assemblage_leaf_sets):
-        self.update_cache(tree=tree)
-        induced_trees = self.generate_induced_trees(tree=tree,
-                assemblage_leaf_sets=assemblage_leaf_sets)
-        for induced_tree in induced_trees:
-            self.update_cache(tree=induced_tree)
-
-    def __call__(self,
-            tree1,
-            tree2,
-            tree1_assemblage_leaf_sets,
-            tree2_assemblage_leaf_sets,
-            is_tree1_cache_updated=False,
-            is_tree2_cache_updated=False,
-            fieldname_prefix=None,
-            ):
-        if fieldname_prefix is None:
-            fieldname_prefix = ""
-        main_trees_score = treecompare.TreeShapeKernel.__call__(self,
-                tree1=tree1,
-                tree2=tree2,
-                is_tree1_cache_updated=is_tree1_cache_updated,
-                is_tree2_cache_updated=is_tree2_cache_updated,
-                )
-        if not is_tree1_cache_updated or tree1 not in self._tree_assemblage_induced_trees_map:
-            if tree1_assemblage_leaf_sets is None:
-                raise ValueError("Uncached tree requires specification of 'tree1_assemblage_leaf_sets'")
-            self.update_assemblage_induced_tree_cache(
-                    tree=tree1,
-                    assemblage_leaf_sets=tree1_assemblage_leaf_sets)
-        if not is_tree2_cache_updated or tree2 not in self._tree_assemblage_induced_trees_map:
-            if tree2_assemblage_leaf_sets is None:
-                raise ValueError("Uncached tree requires specification of 'tree2_assemblage_leaf_sets'")
-            self.update_assemblage_induced_tree_cache(
-                    tree=tree2,
-                    assemblage_leaf_sets=tree2_assemblage_leaf_sets)
-        ## ++ main tree score
-        score_table = collections.OrderedDict()
-        score_table["{}primary.tree.ktd".format(fieldname_prefix)] = main_trees_score
-        induced_trees1 = self._tree_assemblage_induced_trees_map[tree1]
-        induced_trees2 = self._tree_assemblage_induced_trees_map[tree2]
-        # assert len(induced_trees1) == len(induced_trees2) == self._num_assemblage_classifications
-        if not self.is_exchangeable_assemblage_classifications:
-            if len(induced_trees1) != len(induced_trees2):
-                raise TypeError("Different numbers of induced trees not supported for non-exchangeable classifications: {} vs. {}".format(len(induced_trees1), len(induced_trees2)))
-            for idx, (induced_tree1, induced_tree2) in enumerate(zip(induced_trees1, induced_trees2)):
-                s = treecompare.TreeShapeKernel.__call__(self,
-                                tree1=induced_tree1,
-                                tree2=induced_tree2,
-                                is_tree1_cache_updated=True,
-                                is_tree2_cache_updated=True,
-                                )
-                ## ++ raw scores direct comparisons of each of the induced trees
-                score_table["{}induced.tree.{}.ktd".format(fieldname_prefix, idx+1)] = s
-        else:
-            if self.exchangeable_assemblage_comparison_strategy == "joint minimum":
-                # if lengths are different, we want to fix the smaller set
-                if len(induced_trees1) > len(induced_trees2):
-                    induced_trees2, induced_trees1 = induced_trees1, induced_trees2
-                comparison_vector = [0.0] * len(induced_trees1)
-                current_minimum_distance = None
-                current_joint_minimum_vector = None
-                for induced_trees_permutation in itertools.permutations(induced_trees2, len(induced_trees1)):
-                    distances = []
-                    for t2, t1 in zip(induced_trees_permutation, induced_trees1):
-                        distances.append(treecompare.TreeShapeKernel.__call__(self,
-                                tree1=t1,
-                                tree2=t2,
-                                is_tree1_cache_updated=True,
-                                is_tree2_cache_updated=True,))
-                    euclidean_distance = self._euclidean_distance(distances, comparison_vector)
-                    if current_minimum_distance is None or euclidean_distance < current_minimum_distance:
-                        current_minimum_distance = euclidean_distance
-                        current_joint_minimum_vector = distances
-                for didx, d in enumerate(distances):
-                    score_table["{}induced.tree.{}.ktd".format(fieldname_prefix, didx+1)] = d
-                for didx in range(didx+1, self._num_assemblage_classifications):
-                    score_table["{}induced.tree.{}.ktd".format(fieldname_prefix, didx+1)] = "NA"
-            else:
-                raise NotImplementedError()
-        return score_table
 
 class SummaryStatsCalculator(object):
 
@@ -193,6 +75,24 @@ class SummaryStatsCalculator(object):
         self.bind_to_host_history(host_history)
         self.tree_shape_kernel = treecompare.TreeShapeKernel()
 
+    def get_profile_for_tree(self, tree):
+        tree_profile = profiledistance.TreeProfile(
+                tree=tree,
+                is_measure_edge_lengths=True,
+                is_measure_patristic_distances=True,
+                is_measure_patristic_steps=True,
+                is_measure_node_distances=True,
+                is_measure_node_steps=True,
+                is_measure_node_ages=True,
+                is_measure_coalescence_intervals=True,
+                is_normalize=True,
+                ultrametricity_precision=constants.DEFAULT_ULTRAMETRICITY_PRECISION,
+                tree_phylogenetic_distance_matrix=None,
+                tree_node_distance_matrix=None,
+                tree_id=None,
+                )
+        return tree_profile
+
     def bind_to_host_history(self, host_history):
         self.host_history = host_history
         self.host_tree = host_history.tree
@@ -200,6 +100,8 @@ class SummaryStatsCalculator(object):
                 tree=self.host_tree,
                 assemblage_leaf_sets=self.host_history.area_assemblage_leaf_sets,
                 skip_null_assemblages=False)
+        self.host_tree_profile = self.get_profile_for_tree(self.host_tree)
+        self.host_area_assemblage_tree_profiles = [self.get_profile_for_tree(t) for t in self.host_area_assemblage_trees]
 
     def calculate(self, symbiont_phylogeny, host_system, simulation_elapsed_time):
         old_taxon_namespace = self.preprocess_tree(symbiont_phylogeny)
@@ -207,13 +109,15 @@ class SummaryStatsCalculator(object):
         current_host_leaf_lineages = list(host_system.extant_host_lineages_at_current_time(simulation_elapsed_time))
         symbiont_phylogeny_leaf_sets_by_area = [set() for i in range(host_system.num_areas)]
         symbiont_phylogeny_leaf_sets_by_host = [set() for i in current_host_leaf_lineages]
-        for symbiont_lineage in symbiont_phylogeny.leaf_node_iter():
+        for leaf_idx, symbiont_lineage in enumerate(symbiont_phylogeny.leaf_node_iter()):
             for area in symbiont_lineage.area_iter():
                 symbiont_phylogeny_leaf_sets_by_area[area.area_idx].add(symbiont_lineage)
             for host_idx, host_lineage in enumerate(current_host_leaf_lineages):
                 # if symbiont_lineage.has_host(host_system.host_lineages_by_id[host.lineage_definition.lineage_id]):
                 if symbiont_lineage.has_host(host_lineage):
                     symbiont_phylogeny_leaf_sets_by_host[host_idx].add(symbiont_lineage)
+        if leaf_idx < 2:
+            raise error.InsufficientLineagesGenerated("Generated tree has too few lineages ({})".format(leaf_idx))
         if not self.ignore_incomplete_host_occupancies:
             if set() in symbiont_phylogeny_leaf_sets_by_host:
                 raise error.IncompleteHostOccupancyException("incomplete host occupancy")
@@ -221,17 +125,23 @@ class SummaryStatsCalculator(object):
             if set() in symbiont_phylogeny_leaf_sets_by_area:
                 raise error.IncompleteAreaOccupancyException("incomplete area occupancy")
 
-        ## main trees kernel trick
+        symbiont_area_assemblage_trees = self.generate_induced_trees(
+                tree=symbiont_phylogeny,
+                assemblage_leaf_sets=symbiont_phylogeny_leaf_sets_by_area,
+                skip_null_assemblages=False)
+        symbiont_host_assemblage_trees = self.generate_induced_trees(
+                tree=symbiont_phylogeny,
+                assemblage_leaf_sets=symbiont_phylogeny_leaf_sets_by_host,
+                skip_null_assemblages=False)
+
         results = collections.OrderedDict()
+
+        ## main trees kernel trick
         results["predictor.primary.tree.tsktd"] = self.tree_shape_kernel(
                 tree1=self.host_tree,
                 tree2=symbiont_phylogeny)
 
         ## area trees kernel trick
-        symbiont_area_assemblage_trees = self.generate_induced_trees(
-                tree=symbiont_phylogeny,
-                assemblage_leaf_sets=symbiont_phylogeny_leaf_sets_by_area,
-                skip_null_assemblages=False)
         results.update(self.tree_shape_kernel_compare_trees(
             trees1=self.host_area_assemblage_trees,
             trees2=symbiont_area_assemblage_trees,
@@ -244,10 +154,6 @@ class SummaryStatsCalculator(object):
             self.tree_shape_kernel.remove_from_cache(induced_tree)
 
         ## host trees kernel trick
-        symbiont_host_assemblage_trees = self.generate_induced_trees(
-                tree=symbiont_phylogeny,
-                assemblage_leaf_sets=symbiont_phylogeny_leaf_sets_by_host,
-                skip_null_assemblages=False)
         results.update(self.tree_shape_kernel_compare_trees(
             trees1=self.host_area_assemblage_trees,
             trees2=symbiont_host_assemblage_trees,
@@ -259,8 +165,73 @@ class SummaryStatsCalculator(object):
         for induced_tree in symbiont_host_assemblage_trees:
             self.tree_shape_kernel.remove_from_cache(induced_tree)
 
+        ## main tree profile distance
+        symbiont_tree_profile = self.get_profile_for_tree(tree=symbiont_phylogeny)
+        self.compare_profiles(
+                profile1=self.host_tree_profile,
+                profile2=symbiont_tree_profile,
+                fieldname_prefix="predictor.profiledist.main.trees.",
+                fieldname_suffix="",
+                results=results)
+        self.compare_multi_profiles(
+                profiles1=[self.get_profile_for_tree(t) for t in self.host_area_assemblage_trees],
+                profiles2=[self.get_profile_for_tree(t) for t in symbiont_area_assemblage_trees],
+                fieldname_prefix="predictor.profiledist.area.assemblage.",
+                fieldname_suffix="",
+                results=results)
+
         self.restore_tree(symbiont_phylogeny, old_taxon_namespace)
         return results
+
+    def compare_profiles(self,
+            profile1,
+            profile2,
+            fieldname_prefix,
+            fieldname_suffix,
+            results):
+        d = profile1.measure_distances(profile2)
+        for key in d:
+            results["{}{}{}".format(fieldname_prefix, key, fieldname_suffix)] = d[key]
+        return results
+
+    def compare_multi_profiles(self,
+            profiles1,
+            profiles2,
+            fieldname_prefix,
+            fieldname_suffix,
+            results,
+            default_value_for_missing_comparisons="NA",
+            ):
+        if len(profiles1) > len(profiles2):
+            profiles2, profiles1 = profiles1, profiles2
+        comparison_vectors = {}
+        current_minimum_distances = {}
+        current_joint_minimum_vectors = {}
+        measurement_names = profiles1[0].measurement_names
+        for name in measurement_names:
+            comparison_vectors[name] = [0.0] * len(profiles1)
+            current_minimum_distances[name] = None
+            current_joint_minimum_vectors[name] = None
+        for profile_permutation in itertools.permutations(profiles2, len(profiles1)):
+            distances = {}
+            for p2, p1 in zip(profile_permutation, profiles1):
+                pd = p1.measure_distances(p2)
+                for name in measurement_names:
+                    try:
+                        distances[name].append(pd[name])
+                    except KeyError:
+                        distances[name] = [pd[name]]
+            for name in measurement_names:
+                ed = self._euclidean_distance(distances[name], comparison_vectors[name])
+                if current_minimum_distances[name] is None or ed < current_minimum_distances[name]:
+                    current_minimum_distances[name] = ed
+                    current_joint_minimum_vectors[name] = distances[name]
+        for name in measurement_names:
+            for didx, d in enumerate(current_joint_minimum_vectors[name]):
+                results["{}{}{}{}".format(fieldname_prefix, name, didx+1, fieldname_suffix, )] = d
+            if default_value_for_missing_comparisons is not False:
+                for didx in range(didx+1, len(profiles2)):
+                    results["{}{}{}{}".format(fieldname_prefix, name, didx+1, fieldname_suffix, )] = default_value_for_missing_comparisons
 
     def tree_shape_kernel_compare_trees(self,
             trees1,
@@ -303,7 +274,7 @@ class SummaryStatsCalculator(object):
                 if current_minimum_distance is None or euclidean_distance < current_minimum_distance:
                     current_minimum_distance = euclidean_distance
                     current_joint_minimum_vector = distances
-            for didx, d in enumerate(distances):
+            for didx, d in enumerate(current_joint_minimum_vector):
                 score_table["{}{}{}".format(fieldname_prefix, didx+1, fieldname_suffix, )] = d
             if default_value_for_missing_comparisons is not False:
                 for didx in range(didx+1, len(trees2)):
@@ -324,33 +295,4 @@ class SummaryStatsCalculator(object):
         for nd in tree:
             nd.taxon = None
         tree.taxon_namespace = taxon_namespace
-
-    # def create_area_comparator(self):
-    #     area_tree_shape_comparator = AssemblageInducedTreeShapeKernel(
-    #             is_exchangeable_assemblage_classifications=self.is_exchangeable_areas,
-    #             induced_tree_factory=dendropy.Tree,
-    #             induced_tree_node_factory=dendropy.Node,
-    #             )
-    #     area_tree_shape_comparator.update_assemblage_induced_tree_cache(
-    #             tree=self.host_history.tree,
-    #             assemblage_leaf_sets=self.host_history.area_assemblage_leaf_sets,
-    #             )
-    #     return area_tree_shape_comparator
-
-    # def create_host_comparator(self):
-    #     host_tree_shape_comparator = AssemblageInducedTreeShapeKernel(
-    #             is_exchangeable_assemblage_classifications=False,
-    #             induced_tree_factory=dendropy.Tree,
-    #             induced_tree_node_factory=dendropy.Node,
-    #             skip_null_assemblages=True,
-    #             )
-    #     # Note this order will vary from run to run (because `host_system.extant_host_leaf_lineages` is a set).
-    #     # Also note that we assume here that this calculation occurs at the end of the run; must use `extant_host_lineages_at_current_time` if not.
-    #     self.extant_host_leaf_lineages = list(self.host_history.extant_leaf_lineages)
-    #     ## basically, our induced subtrees area the entire tree for each host
-    #     host_tree_shape_comparator.update_assemblage_induced_tree_cache(
-    #             tree=self.host_history.tree,
-    #             assemblage_leaf_sets=[set(self.extant_host_leaf_lineages) for i in self.extant_host_leaf_lineages],
-    #             )
-    #     return host_tree_shape_comparator
 

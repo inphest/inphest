@@ -12,6 +12,9 @@ class PostTerminationFailedSimulationException(FailedSimulationException):
 class PreTerminationFailedSimulationException(FailedSimulationException):
     pass
 
+class InsufficientLineagesGenerated(PostTerminationFailedSimulationException):
+    pass
+
 class IncompleteAreaOccupancyException(PostTerminationFailedSimulationException):
     pass
 
