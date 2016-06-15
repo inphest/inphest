@@ -567,12 +567,13 @@ class InphestSimulator(object):
         self.processed_host_events.add(host_event)
 
     def store_sample(self, trees_file):
-        if self.is_process_summary_stats:
-            self.calculate_and_store_summary_stats()
         self.write_tree(
                 out=trees_file,
                 tree=self.phylogeny,
                 )
+        trees_file.flush()
+        if self.is_process_summary_stats:
+            self.calculate_and_store_summary_stats()
 
     def calculate_and_store_summary_stats(self):
         ss = self.summary_stats_calculator.calculate(
@@ -802,7 +803,7 @@ def repeat_run(
                 except error.InphestException as e:
                     run_logger.system = None
                     if isinstance(e, error.PreTerminationFailedSimulationException):
-                        run_logger.info("-inphest- Replicate {} of {}, host regime {} of {}: Simulation failure before termination condition at t = {}: {}".format(current_rep+1, nreps, host_history_idx+1, len(hrs.host_histories), inphest_simulator.elapsed_time, e))
+                        run_logger.info("-inphest- Replicate {} of {}, host regime {} of {}: Simulation failure at t = {} before termination condition reached: {}".format(current_rep+1, nreps, host_history_idx+1, len(hrs.host_histories), inphest_simulator.elapsed_time, e))
                     elif isinstance(e, error.PostTerminationFailedSimulationException):
                         run_logger.info("-inphest- Replicate {} of {}, host regime {} of {}: Post-simulation failure: {}".format(current_rep+1, nreps, host_history_idx+1, len(hrs.host_histories), e))
                     else:
