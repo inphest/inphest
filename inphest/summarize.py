@@ -243,17 +243,26 @@ class SummaryStatsCalculator(object):
         for profile_permutation in itertools.permutations(profiles2, len(profiles1)):
             distances = {}
             for p2, p1 in zip(profile_permutation, profiles1):
-                pd = p1.measure_distances(p2)
+                try:
+                    pd = p1.measure_distances(p2)
+                except ValueError:
+                    ### TODO: better handling here: (1) specialized error raised by profiledistance + option of quitting or continuing
+                    continue
                 for name in measurement_names:
                     try:
                         distances[name].append(pd[name])
                     except KeyError:
                         distances[name] = [pd[name]]
+            if not distances:
+                ### TODO: ditto re: better handling
+                continue
             for name in measurement_names:
                 ed = self._euclidean_distance(distances[name], comparison_vectors[name])
                 if current_minimum_distances[name] is None or ed < current_minimum_distances[name]:
                     current_minimum_distances[name] = ed
                     current_joint_minimum_vectors[name] = distances[name]
+        if  not current_joint_minimum_vectors:
+            raise error.InsufficientLineagesGenerated("Insufficient symbiont lineages in one or more hosts or areas")
         for name in measurement_names:
             for didx, d in enumerate(current_joint_minimum_vectors[name]):
                 results["{}{}{}{}".format(fieldname_prefix, name, didx+1, fieldname_suffix, )] = d
