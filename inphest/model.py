@@ -1476,6 +1476,7 @@ class InphestModel(object):
         model_definition["anagenetic_geographical_range_evolution"] = self.anagenetic_geographical_range_evolution_as_definition()
         model_definition["cladogenetic_geographical_range_evolution"] = self.cladogenetic_geographical_range_evolution_as_definition()
         json.dump(model_definition, out, indent=4, separators=(',', ': '))
+        out.flush()
 
     def diversification_as_definition(self):
         d = collections.OrderedDict()
