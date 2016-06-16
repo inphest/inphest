@@ -74,6 +74,7 @@ class SummaryStatsCalculator(object):
         self.ignore_incomplete_area_occupancies = False
         self.bind_to_host_history(host_history)
         self.tree_shape_kernel = treecompare.TreeShapeKernel()
+        self.num_sum_stats = None
 
     def get_profile_for_tree(self, tree):
         tree_profile = profiledistance.TreeProfile(
@@ -207,6 +208,16 @@ class SummaryStatsCalculator(object):
                 fieldname_prefix="predictor.profiledist.host.vs.area.assemblage.",
                 fieldname_suffix="",
                 results=results)
+
+        num_sum_stats = len(results)
+        if self.num_sum_stats is None:
+            self.num_sum_stats = num_sum_stats
+        elif num_sum_stats > self.num_sum_stats:
+            ### TODO: how to handle this?? Indicates earlier summary statistics
+            ### were deficient
+            self.num_sum_stats = num_sum_stats
+        elif num_sum_stats < self.num_sum_stats:
+            raise error.SummaryStatisticsCalculationFailure("Failed to calculate one or more summary statistics")
 
         self.restore_tree(symbiont_phylogeny, old_taxon_namespace)
         return results
