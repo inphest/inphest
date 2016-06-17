@@ -129,11 +129,19 @@ class InphestSimulator(object):
         if not self.trees_file:
             self.run_logger.warning("No trees will be stored!")
 
-        self.failed_trees_file = config_d.pop("failed_trees_file", None)
-        if self.failed_trees_file is None:
-            self.failed_trees_file = open(InphestSimulator.compose_failed_trees_filepath(self.output_prefix), "w")
-        if verbose:
-            self.run_logger.info("Output failed trees filepath: {}".format(self.failed_trees_file.name))
+        self.debug_mode = config_d.pop("debug_mode", False)
+        if verbose and self.debug_mode:
+            self.run_logger.info("Running in DEBUG mode")
+
+        if self.debug_mode:
+            self.is_store_failed_trees = config_d.pop("store_failed_trees", True)
+            self.failed_trees_file = config_d.pop("failed_trees_file", None)
+            if self.failed_trees_file is None:
+                self.failed_trees_file = open(InphestSimulator.compose_failed_trees_filepath(self.output_prefix), "w")
+            if verbose:
+                self.run_logger.info("Output failed trees filepath: {}".format(self.failed_trees_file.name))
+        else:
+            self.is_store_failed_trees = config_d.pop("store_failed_trees", False)
 
         self.is_suppress_internal_node_labels = config_d.pop("suppress_internal_node_labels", True)
         if verbose:
@@ -179,10 +187,6 @@ class InphestSimulator(object):
                 self.run_logger.info("Using existing random number generator")
 
         self.log_frequency = config_d.pop("log_frequency", None)
-
-        self.debug_mode = config_d.pop("debug_mode", False)
-        if verbose and self.debug_mode:
-            self.run_logger.info("Running in DEBUG mode")
 
         if config_d.pop("store_model_description", True):
             self.model_description_file = config_d.pop("model_description_file", None)
@@ -587,8 +591,9 @@ class InphestSimulator(object):
             if self.is_process_summary_stats:
                 self.calculate_and_store_summary_stats()
         except:
-            self.failed_trees_file.write(tree_str)
-            self.failed_trees_file.flush()
+            if self.is_store_failed_trees:
+                self.failed_trees_file.write(tree_str)
+                self.failed_trees_file.flush()
             raise
         self.trees_file.write(tree_str)
         self.trees_file.flush()
@@ -759,8 +764,9 @@ def repeat_run(
         run_logger.info("-inphest- Using existing RNG: {}".format(config_d["rng"]))
     if config_d.get("store_trees", True) and "trees_file" not in config_d:
         config_d["trees_file"] = open(InphestSimulator.compose_trees_filepath(output_prefix), "w")
-    if config_d.get("store_failed_trees", True) and "failed_trees_file" not in config_d:
-        config_d["failed_trees_file"] = open(InphestSimulator.compose_failed_trees_filepath(output_prefix), "w")
+    if (debug_mode and config_d.get("store_failed_trees", True)) or config_d.get("store_failed_trees", False):
+        if "failed_trees_file" not in config_d:
+            config_d["failed_trees_file"] = open(InphestSimulator.compose_failed_trees_filepath(output_prefix), "w")
     if config_d.get("store_summary_stats", True) and "summary_stats_file" not in config_d:
         config_d["summary_stats_file"] = InphestSimulator.open_summary_stats_file(output_prefix)
 
