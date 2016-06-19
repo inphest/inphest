@@ -74,7 +74,7 @@ class SummaryStatsCalculator(object):
         self.ignore_incomplete_area_occupancies = False
         self.bind_to_host_history(host_history)
         self.tree_shape_kernel = treecompare.TreeShapeKernel()
-        self.num_sum_stats = None
+        self.num_profile_measurements = 6
 
     def get_profile_for_tree(self, tree):
         tree_profile = profiledistance.TreeProfile(
@@ -137,13 +137,17 @@ class SummaryStatsCalculator(object):
                 skip_null_assemblages=False)
 
         results = collections.OrderedDict()
+        expected_num_sum_stats = 0
 
         ## main trees kernel trick
+        expected_num_sum_stats += 1
         results["predictor.primary.tree.tsktd"] = self.tree_shape_kernel(
                 tree1=self.host_tree,
                 tree2=symbiont_phylogeny)
+        self.check_successful_subcalculation(expected_num_sum_stats, results, "predictor.primary.tree.tsktd")
 
         ## area trees kernel trick
+        expected_num_sum_stats += ( min(len(self.host_area_assemblage_trees), len(symbiont_area_assemblage_trees)) )
         results.update(self.tree_shape_kernel_compare_trees(
             trees1=self.host_area_assemblage_trees,
             trees2=symbiont_area_assemblage_trees,
@@ -154,20 +158,24 @@ class SummaryStatsCalculator(object):
             ))
         for induced_tree in symbiont_area_assemblage_trees:
             self.tree_shape_kernel.remove_from_cache(induced_tree)
+        self.check_successful_subcalculation(expected_num_sum_stats, results, "predictor.area.assemblage.tsktd")
 
         ## host trees kernel trick
+        expected_num_sum_stats += ( min(len(self.host_area_assemblage_trees), len(symbiont_host_assemblage_trees)) )
         results.update(self.tree_shape_kernel_compare_trees(
             trees1=self.host_area_assemblage_trees,
             trees2=symbiont_host_assemblage_trees,
-            fieldname_prefix="predictor.host.assemblage.tsktd",
+            fieldname_prefix="predictor.host.assemblage.tsktd.",
             fieldname_suffix="",
             is_exchangeable_assemblage_classifications=True,
             default_value_for_missing_comparisons=False,
             ))
         for induced_tree in symbiont_host_assemblage_trees:
             self.tree_shape_kernel.remove_from_cache(induced_tree)
+        self.check_successful_subcalculation(expected_num_sum_stats, results, "predictor.host.assemblage.tsktd.")
 
         ## host trees vs. area trees kernel trick
+        expected_num_sum_stats += ( min(len(self.host_area_assemblage_trees), len(symbiont_host_assemblage_trees)) )
         results.update(self.tree_shape_kernel_compare_trees(
             trees1=symbiont_area_assemblage_trees,
             trees2=symbiont_host_assemblage_trees,
@@ -178,8 +186,10 @@ class SummaryStatsCalculator(object):
             ))
         for induced_tree in symbiont_host_assemblage_trees:
             self.tree_shape_kernel.remove_from_cache(induced_tree)
+        self.check_successful_subcalculation(expected_num_sum_stats, results, "predictor.host.vs.area.assemblage.tsktd")
 
         ## main tree profile distance
+        expected_num_sum_stats += self.num_profile_measurements
         symbiont_tree_profile = self.get_profile_for_tree(tree=symbiont_phylogeny)
         self.compare_profiles(
                 profile1=self.host_tree_profile,
@@ -187,40 +197,45 @@ class SummaryStatsCalculator(object):
                 fieldname_prefix="predictor.profiledist.main.trees.",
                 fieldname_suffix="",
                 results=results)
+        self.check_successful_subcalculation(expected_num_sum_stats, results, "predictor.profiledist.main.trees.")
+
         host_area_assemblage_profiles = [self.get_profile_for_tree(t) for t in self.host_area_assemblage_trees]
-        symbiont_area_assemblage_profiles = [self.get_profile_for_tree(t) for t in symbiont_area_assemblage_trees]
         symbiont_host_assemblage_profiles = [self.get_profile_for_tree(t) for t in symbiont_host_assemblage_trees]
+        symbiont_area_assemblage_profiles = [self.get_profile_for_tree(t) for t in symbiont_area_assemblage_trees]
+
+        expected_num_sum_stats += min( len(host_area_assemblage_profiles), len(symbiont_area_assemblage_profiles) ) * self.num_profile_measurements
         self.compare_multi_profiles(
                 profiles1=host_area_assemblage_profiles,
                 profiles2=symbiont_area_assemblage_profiles,
                 fieldname_prefix="predictor.profiledist.area.assemblage.",
                 fieldname_suffix="",
                 results=results)
+        self.check_successful_subcalculation(expected_num_sum_stats, results,"predictor.profiledist.area.assemblage." )
+
+        expected_num_sum_stats += min( len(host_area_assemblage_profiles), len(symbiont_host_assemblage_profiles) ) * self.num_profile_measurements
         self.compare_multi_profiles(
                 profiles1=host_area_assemblage_profiles,
                 profiles2=symbiont_host_assemblage_profiles,
                 fieldname_prefix="predictor.profiledist.host.assemblage.",
                 fieldname_suffix="",
                 results=results)
+        self.check_successful_subcalculation(expected_num_sum_stats, results, "predictor.profiledist.host.assemblage.")
+
+        expected_num_sum_stats += min( len(host_area_assemblage_profiles), len(symbiont_area_assemblage_profiles) ) * self.num_profile_measurements
         self.compare_multi_profiles(
                 profiles1=host_area_assemblage_profiles,
-                profiles2=symbiont_host_assemblage_profiles,
+                profiles2=symbiont_area_assemblage_profiles,
                 fieldname_prefix="predictor.profiledist.host.vs.area.assemblage.",
                 fieldname_suffix="",
                 results=results)
-
-        num_sum_stats = len(results)
-        if self.num_sum_stats is None:
-            self.num_sum_stats = num_sum_stats
-        elif num_sum_stats > self.num_sum_stats:
-            ### TODO: how to handle this?? Indicates earlier summary statistics
-            ### were deficient
-            self.num_sum_stats = num_sum_stats
-        elif num_sum_stats < self.num_sum_stats:
-            raise error.SummaryStatisticsCalculationFailure("Failed to calculate one or more summary statistics")
+        self.check_successful_subcalculation(expected_num_sum_stats, results, "predictor.profiledist.host.vs.area.assemblage.")
 
         self.restore_tree(symbiont_phylogeny, old_taxon_namespace)
         return results
+
+    def check_successful_subcalculation(self, expected_num_sum_stats, results, message):
+        if len(results) != expected_num_sum_stats:
+            raise error.SummaryStatisticsCalculationFailure("Failed to calculate one or more summary statistics: expecting {} results but only found {} ({})".format(expected_num_sum_stats, len(results), message))
 
     def compare_profiles(self,
             profile1,
