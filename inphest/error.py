@@ -21,9 +21,12 @@ class SummaryStatisticsCalculationFailure(PostTerminationFailedSimulationExcepti
 class InsufficientLineagesGenerated(SummaryStatisticsCalculationFailure):
     pass
 
-class IncompleteAreaOccupancyException(SummaryStatisticsCalculationFailure):
+class IncompleteStateSpaceOccupancyException(SummaryStatisticsCalculationFailure):
     pass
 
-class IncompleteHostOccupancyException(SummaryStatisticsCalculationFailure):
+class IncompleteAreaOccupancyException(IncompleteStateSpaceOccupancyException):
+    pass
+
+class IncompleteHostOccupancyException(IncompleteStateSpaceOccupancyException):
     pass
 

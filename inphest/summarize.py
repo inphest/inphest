@@ -193,13 +193,22 @@ class SummaryStatsCalculator(object):
                 else:
                     stat_fn_name = "standardized_effect_size_mean_nearest_taxon_distance"
                 stat_fn = getattr(phylogenetic_distance_matrix, stat_fn_name)
-                results_group = stat_fn(
-                    assemblage_memberships=assemblage_memberships,
-                    is_weighted_edge_distances=is_weighted_edge_distances,
-                    is_normalize_by_tree_size=True,
-                    num_randomization_replicates=self.num_randomization_replicates,
-                    )
-                assert len(results_group) == len(assemblage_memberships)
+                try:
+                    results_group = stat_fn(
+                        assemblage_memberships=assemblage_memberships,
+                        is_weighted_edge_distances=is_weighted_edge_distances,
+                        is_normalize_by_tree_size=True,
+                        num_randomization_replicates=self.num_randomization_replicates,
+                        )
+                except dendropy.utility.error.SingleTaxonAssemblageException as e:
+                    if not report_character_state_specific_results:
+                        continue
+                    else:
+                        raise
+                if not report_character_state_specific_results:
+                    assert len(results_group) == len(assemblage_memberships)
+                if len(results_group) == 0:
+                    raise error.IncompleteStateSpaceOccupancyException
                 for result, assemblage_desc in zip(results_group, assemblage_descriptions):
                     for ses_result_statistic in stat_scores_to_be_harvested:
                         character_class_statistic_prefix = self.stat_name_delimiter.join([
