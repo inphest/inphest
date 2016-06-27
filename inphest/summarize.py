@@ -140,13 +140,16 @@ class SummaryStatsCalculator(object):
                 "assemblage_basis_state_id": "state{}{}".format(self.stat_name_delimiter, area_idx),
             }
             area_assemblage_descriptions.append(regime)
-        results.update(self._calc_community_ecology_stats(
+        subresults = self._calc_community_ecology_stats(
             phylogenetic_distance_matrix=symbiont_pdm,
             assemblage_memberships=symbiont_phylogeny_leaf_sets_by_area,
             assemblage_descriptions=area_assemblage_descriptions,
             report_character_state_specific_results=False,
             report_character_class_wide_results=True,
-            ))
+            )
+        if len(subresults) < 24:
+            raise error.IncompleteAreaOccupancyException("Incomplete area occupancy")
+        results.update(subresults)
 
         host_assemblage_descriptions = []
         for host_idx, hosts in enumerate(symbiont_phylogeny_leaf_sets_by_host):
@@ -155,13 +158,16 @@ class SummaryStatsCalculator(object):
                 "assemblage_basis_state_id": "state{}{}".format(self.stat_name_delimiter, host_idx),
             }
             host_assemblage_descriptions.append(regime)
-        results.update(self._calc_community_ecology_stats(
+        subresults = self._calc_community_ecology_stats(
             phylogenetic_distance_matrix=symbiont_pdm,
             assemblage_memberships=symbiont_phylogeny_leaf_sets_by_host,
             assemblage_descriptions=host_assemblage_descriptions,
             report_character_state_specific_results=False,
             report_character_class_wide_results=True,
-            ))
+            )
+        if len(subresults) < 24:
+            raise error.IncompleteAreaOccupancyException("Incomplete host occupancy")
+        results.update(subresults)
 
         self.restore_tree(symbiont_phylogeny, old_taxon_namespace)
         return results
@@ -177,7 +183,7 @@ class SummaryStatsCalculator(object):
         assert len(assemblage_descriptions) == len(assemblage_memberships)
 
         summary_statistics_suite = collections.OrderedDict()
-        results_by_character_class = {}
+        results_by_character_class = collections.OrderedDict()
         stat_scores_to_be_harvested = ("obs", "z", "p",) # z = score, p = p-value (turns out this is quite informative)
         for sstbh in stat_scores_to_be_harvested:
             results_by_character_class[sstbh] = collections.defaultdict(list)
