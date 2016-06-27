@@ -18,7 +18,52 @@ from dendropy.calculate import treecompare
 from dendropy.calculate import profiledistance
 from dendropy.utility import constants
 from dendropy.calculate import statistics
+from dendropy.interop import paup
 from inphest import error
+
+
+def estimate_tree_from_assemblage_leafsets(
+        taxon_namespace,
+        assemblage_memberships,
+        membership_element_type=dendropy.Taxon,
+        only_include_taxa=None,
+        ):
+    d = collections.OrderedDict()
+    blank = ["0" for i in range(len(assemblage_memberships))]
+    exclude_from_taxa_blocks = set()
+    for taxon in taxon_namespace:
+        if only_include_taxa and taxon in only_include_taxa:
+            d[taxon] = list(blank)
+        else:
+            exclude_from_taxa_blocks.add(taxon)
+    for idx, taxa in enumerate(assemblage_memberships):
+        if membership_element_type is dendropy.Taxon:
+            for taxon in taxa:
+                d[taxon][idx] = "1"
+        elif membership_element_type is dendropy.Node:
+            for node in taxa:
+                d[node.taxon][idx] = "1"
+        else:
+            raise TypeError(membership_element_type)
+    # for membership_idx, membership in enumerate(assemblage_memberships):
+    #     for element in membership:
+    #         if membership_element_type is dendropy.Taxon:
+    #             taxon = element
+    #     elif membership_element_type is dendropy.Node:
+    #             taxon = element.taxon
+    #     else:
+    #         raise TypeError(membership_element_type)
+    char_matrix = dendropy.StandardCharacterMatrix.from_dict(
+            source_dict=d,
+            taxon_namespace=taxon_namespace)
+    tree = paup.estimate_tree(
+            char_matrix=char_matrix,
+            tree_est_criterion="parsimony",
+            num_states=len(assemblage_memberships),
+            char_matrix_writing_kwargs={"exclude_from_taxa_blocks": exclude_from_taxa_blocks},
+            )
+    # print(tree.as_string("nexus", exclude_from_taxa_blocks=exclude_from_taxa_blocks))
+    return tree
 
 class SummaryStatsCalculator(object):
 
@@ -102,12 +147,19 @@ class SummaryStatsCalculator(object):
     def bind_to_host_history(self, host_history):
         self.host_history = host_history
         self.host_tree = host_history.tree
-        self.host_area_assemblage_trees = self.generate_induced_trees(
-                tree=self.host_tree,
-                assemblage_leaf_sets=self.host_history.area_assemblage_leaf_sets,
-                skip_null_assemblages=False)
-        self.host_tree_profile = self.get_profile_for_tree(self.host_tree)
-        self.host_area_assemblage_tree_profiles = [self.get_profile_for_tree(t) for t in self.host_area_assemblage_trees]
+        assert host_history.tree.taxon_namespace is self.host_history.taxon_namespace
+        self.host_area_tree = estimate_tree_from_assemblage_leafsets(
+                assemblage_memberships=self.host_history.area_assemblage_leaf_sets,
+                taxon_namespace=self.host_history.taxon_namespace,
+                membership_element_type=dendropy.Node,
+                only_include_taxa=set([nd.taxon for nd in self.host_history.extant_leaf_nodes]),
+                )
+        # self.host_area_assemblage_trees = self.generate_induced_trees(
+        #         tree=self.host_tree,
+        #         assemblage_leaf_sets=self.host_history.area_assemblage_leaf_sets,
+        #         skip_null_assemblages=False)
+        # self.host_tree_profile = self.get_profile_for_tree(self.host_tree)
+        # self.host_area_assemblage_tree_profiles = [self.get_profile_for_tree(t) for t in self.host_area_assemblage_trees]
 
     def calculate(self, symbiont_phylogeny, host_system, simulation_elapsed_time):
         old_taxon_namespace = self.preprocess_tree(symbiont_phylogeny)
@@ -129,7 +181,15 @@ class SummaryStatsCalculator(object):
         if not self.ignore_incomplete_area_occupancies:
             if set() in symbiont_phylogeny_leaf_sets_by_area:
                 raise error.IncompleteAreaOccupancyException("incomplete area occupancy")
+
         results = collections.OrderedDict()
+
+        symbiont_area_tree = estimate_tree_from_assemblage_leafsets(
+                assemblage_memberships=symbiont_phylogeny_leaf_sets_by_area,
+                taxon_namespace=symbiont_phylogeny.taxon_namespace,
+                membership_element_type=dendropy.Taxon,
+                # only_include_taxa=set([nd.taxon for nd in self.host_history.extant_leaf_nodes]),
+                )
 
         symbiont_pdm = symbiont_phylogeny.phylogenetic_distance_matrix()
 

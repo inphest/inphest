@@ -232,6 +232,7 @@ class HostHistory(object):
                 self.lineage_distance_matrix[key1] = {}
                 node1.lineage_definition = self.lineages[key1]
                 if node1.lineage_definition.is_extant_leaf:
+                    node1.taxon.is_extant_leaf = True
                     self.extant_leaf_nodes.add(node1)
                     for idx, presence in enumerate(node1.lineage_definition.lineage_end_distribution_bitstring):
                         if self.area_assemblage_leaf_sets is None:
@@ -242,6 +243,8 @@ class HostHistory(object):
                             self.area_assemblage_leaf_sets[idx].add(node1)
                         else:
                             assert presence == "0"
+                elif node1.taxon is not None:
+                    node1.taxon.is_extant_leaf = False
             for node2 in ndm:
                 key2 = int(node2.edge.bipartition.split_bitmask)
                 assert key2 in self.lineages
