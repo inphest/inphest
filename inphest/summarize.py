@@ -17,6 +17,7 @@ import dendropy
 from dendropy.calculate import treecompare
 from dendropy.calculate import profiledistance
 from dendropy.utility import constants
+from dendropy.calculate import statistics
 from inphest import error
 
 class SummaryStatsCalculator(object):
@@ -75,6 +76,9 @@ class SummaryStatsCalculator(object):
         self.bind_to_host_history(host_history)
         self.tree_shape_kernel = treecompare.TreeShapeKernel()
         self.num_profile_measurements = 6
+        self.stat_name_delimiter = "."
+        self.num_randomization_replicates = 100
+        self.stat_name_prefix = "predictor"
 
     def get_profile_for_tree(self, tree):
         tree_profile = profiledistance.TreeProfile(
@@ -106,6 +110,145 @@ class SummaryStatsCalculator(object):
         self.host_area_assemblage_tree_profiles = [self.get_profile_for_tree(t) for t in self.host_area_assemblage_trees]
 
     def calculate(self, symbiont_phylogeny, host_system, simulation_elapsed_time):
+        old_taxon_namespace = self.preprocess_tree(symbiont_phylogeny)
+        current_host_leaf_lineages = list(host_system.extant_host_lineages_at_current_time(simulation_elapsed_time))
+        symbiont_phylogeny_leaf_sets_by_area = [set() for i in range(host_system.num_areas)]
+        symbiont_phylogeny_leaf_sets_by_host = [set() for i in current_host_leaf_lineages]
+        for leaf_idx, symbiont_lineage in enumerate(symbiont_phylogeny.leaf_node_iter()):
+            for area in symbiont_lineage.area_iter():
+                symbiont_phylogeny_leaf_sets_by_area[area.area_idx].add(symbiont_lineage.taxon)
+            for host_idx, host_lineage in enumerate(current_host_leaf_lineages):
+                # if symbiont_lineage.has_host(host_system.host_lineages_by_id[host.lineage_definition.lineage_id]):
+                if symbiont_lineage.has_host(host_lineage):
+                    symbiont_phylogeny_leaf_sets_by_host[host_idx].add(symbiont_lineage.taxon)
+        if leaf_idx <= 2:
+            raise error.InsufficientLineagesGenerated("Generated tree has too few lineages ({})".format(leaf_idx+1))
+        if not self.ignore_incomplete_host_occupancies:
+            if set() in symbiont_phylogeny_leaf_sets_by_host:
+                raise error.IncompleteHostOccupancyException("incomplete host occupancy")
+        if not self.ignore_incomplete_area_occupancies:
+            if set() in symbiont_phylogeny_leaf_sets_by_area:
+                raise error.IncompleteAreaOccupancyException("incomplete area occupancy")
+        results = collections.OrderedDict()
+
+        symbiont_pdm = symbiont_phylogeny.phylogenetic_distance_matrix()
+
+        area_assemblage_descriptions = []
+        for area_idx, areas in enumerate(symbiont_phylogeny_leaf_sets_by_area):
+            regime = {
+                "assemblage_basis_class_id": "area",
+                "assemblage_basis_state_id": "state{}{}".format(self.stat_name_delimiter, area_idx),
+            }
+            area_assemblage_descriptions.append(regime)
+        results.update(self._calc_community_ecology_stats(
+            phylogenetic_distance_matrix=symbiont_pdm,
+            assemblage_memberships=symbiont_phylogeny_leaf_sets_by_area,
+            assemblage_descriptions=area_assemblage_descriptions,
+            report_character_state_specific_results=False,
+            report_character_class_wide_results=True,
+            ))
+
+        host_assemblage_descriptions = []
+        for host_idx, hosts in enumerate(symbiont_phylogeny_leaf_sets_by_host):
+            regime = {
+                "assemblage_basis_class_id": "host",
+                "assemblage_basis_state_id": "state{}{}".format(self.stat_name_delimiter, host_idx),
+            }
+            host_assemblage_descriptions.append(regime)
+        results.update(self._calc_community_ecology_stats(
+            phylogenetic_distance_matrix=symbiont_pdm,
+            assemblage_memberships=symbiont_phylogeny_leaf_sets_by_host,
+            assemblage_descriptions=host_assemblage_descriptions,
+            report_character_state_specific_results=False,
+            report_character_class_wide_results=True,
+            ))
+
+        self.restore_tree(symbiont_phylogeny, old_taxon_namespace)
+        return results
+
+    def _calc_community_ecology_stats(self,
+            phylogenetic_distance_matrix,
+            assemblage_memberships,
+            assemblage_descriptions,
+            report_character_state_specific_results=True,
+            report_character_class_wide_results=True,
+            ):
+
+        assert len(assemblage_descriptions) == len(assemblage_memberships)
+
+        summary_statistics_suite = collections.OrderedDict()
+        results_by_character_class = {}
+        stat_scores_to_be_harvested = ("obs", "z", "p",) # z = score, p = p-value (turns out this is quite informative)
+        for sstbh in stat_scores_to_be_harvested:
+            results_by_character_class[sstbh] = collections.defaultdict(list)
+
+        for edge_weighted_desc in ("unweighted", "weighted"):
+            if edge_weighted_desc:
+                is_weighted_edge_distances = True
+            else:
+                is_weighted_edge_distances = False
+            for underlying_statistic_type_desc in ("mpd", "mntd"):
+                if underlying_statistic_type_desc == "mpd":
+                    stat_fn_name = "standardized_effect_size_mean_pairwise_distance"
+                else:
+                    stat_fn_name = "standardized_effect_size_mean_nearest_taxon_distance"
+                stat_fn = getattr(phylogenetic_distance_matrix, stat_fn_name)
+                results_group = stat_fn(
+                    assemblage_memberships=assemblage_memberships,
+                    is_weighted_edge_distances=is_weighted_edge_distances,
+                    is_normalize_by_tree_size=True,
+                    num_randomization_replicates=self.num_randomization_replicates,
+                    )
+                assert len(results_group) == len(assemblage_memberships)
+                for result, assemblage_desc in zip(results_group, assemblage_descriptions):
+                    for ses_result_statistic in stat_scores_to_be_harvested:
+                        character_class_statistic_prefix = self.stat_name_delimiter.join([
+                            self.stat_name_prefix,
+                            "community",
+                            "by",
+                            assemblage_desc["assemblage_basis_class_id"],
+                            ])
+                        statistic_subtype_desc = self.stat_name_delimiter.join([
+                            edge_weighted_desc,
+                            underlying_statistic_type_desc,
+                            # assemblage_desc["assemblage_basis_state_id"],
+                            ])
+                        character_class_statistic_key = tuple([character_class_statistic_prefix, statistic_subtype_desc])
+                        ses_result_statistic_value = getattr(result, ses_result_statistic)
+                        if ses_result_statistic_value is None:
+                            continue
+                        if report_character_state_specific_results:
+                            character_state_statistic_name = self.stat_name_delimiter.join([
+                                character_class_statistic_prefix,
+                                assemblage_desc["assemblage_basis_state_id"],
+                                statistic_subtype_desc,
+                                ses_result_statistic,
+                                ])
+                            assert character_state_statistic_name not in summary_statistics_suite
+                            summary_statistics_suite[character_state_statistic_name] = ses_result_statistic_value
+                        if report_character_class_wide_results:
+                            results_by_character_class[ses_result_statistic][character_class_statistic_key].append(ses_result_statistic_value)
+        if report_character_class_wide_results:
+            for ses_result_statistic in results_by_character_class:
+                if len(results_by_character_class[ses_result_statistic]) == 0:
+                    continue
+                for key in results_by_character_class[ses_result_statistic]:
+                    character_class_statistic_prefix, statistic_subtype_desc = key
+                    svalues = results_by_character_class[ses_result_statistic][key]
+                    mean_var = statistics.mean_and_sample_variance(svalues)
+                    for s, sdesc in zip( mean_var, ("mean", "var"), ):
+                        sn_title = self.stat_name_delimiter.join([
+                            character_class_statistic_prefix,
+                            sdesc,
+                            statistic_subtype_desc,
+                            ses_result_statistic,
+                            ])
+                        assert sn_title not in summary_statistics_suite
+                        summary_statistics_suite[sn_title] = s
+        return summary_statistics_suite
+
+
+    def calculate2(self, symbiont_phylogeny, host_system, simulation_elapsed_time):
         old_taxon_namespace = self.preprocess_tree(symbiont_phylogeny)
 
         current_host_leaf_lineages = list(host_system.extant_host_lineages_at_current_time(simulation_elapsed_time))
