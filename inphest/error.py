@@ -18,6 +18,9 @@ class PostTerminationFailedSimulationException(FailedSimulationException):
 class SummaryStatisticsCalculationFailure(PostTerminationFailedSimulationException):
     pass
 
+class SummaryStatisticCalculationExternalProcessTimeoutExpired(SummaryStatisticsCalculationFailure):
+    pass
+
 class InsufficientLineagesGenerated(SummaryStatisticsCalculationFailure):
     pass
 

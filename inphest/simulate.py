@@ -604,7 +604,7 @@ class InphestSimulator(object):
                 host_system=self.host_system,
                 simulation_elapsed_time=self.elapsed_time)
         if not self.is_summary_stats_header_written:
-            header = ["model.id"] + ss.keys()
+            header = ["model.id"] + list(ss.keys())
             self.summary_stats_file.write(",".join(header))
             self.summary_stats_file.write("\n")
             self.is_summary_stats_header_written = True

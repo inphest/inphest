@@ -13,6 +13,7 @@
 import collections
 import itertools
 import math
+import subprocess
 import dendropy
 from dendropy.calculate import treecompare
 from dendropy.calculate import profiledistance
@@ -32,7 +33,7 @@ def estimate_tree_from_assemblage_leafsets(
     blank = ["0" for i in range(len(assemblage_memberships))]
     exclude_from_taxa_blocks = set()
     for taxon in taxon_namespace:
-        if only_include_taxa and taxon in only_include_taxa:
+        if not only_include_taxa or taxon in only_include_taxa:
             d[taxon] = list(blank)
         else:
             exclude_from_taxa_blocks.add(taxon)
@@ -56,13 +57,16 @@ def estimate_tree_from_assemblage_leafsets(
     char_matrix = dendropy.StandardCharacterMatrix.from_dict(
             source_dict=d,
             taxon_namespace=taxon_namespace)
-    tree = paup.estimate_tree(
-            char_matrix=char_matrix,
-            tree_est_criterion="parsimony",
-            num_states=len(assemblage_memberships),
-            char_matrix_writing_kwargs={"exclude_from_taxa_blocks": exclude_from_taxa_blocks},
-            )
-    # print(tree.as_string("nexus", exclude_from_taxa_blocks=exclude_from_taxa_blocks))
+    try:
+        tree = paup.estimate_tree(
+                char_matrix=char_matrix,
+                tree_est_criterion="parsimony",
+                num_states=len(assemblage_memberships),
+                char_matrix_writing_kwargs={"exclude_from_taxa_blocks": exclude_from_taxa_blocks},
+                timeout=60,
+                )
+    except subprocess.TimeoutExpired:
+        raise error.SummaryStatisticCalculationExternalProcessTimeoutExpired
     return tree
 
 class SummaryStatsCalculator(object):
@@ -125,6 +129,25 @@ class SummaryStatsCalculator(object):
         self.num_randomization_replicates = 100
         self.stat_name_prefix = "predictor"
 
+    def get_unweighted_profile_for_tree(self, tree):
+        tree_profile = profiledistance.TreeProfile(
+                tree=tree,
+                is_measure_edge_lengths=False,
+                is_measure_patristic_distances=False,
+                is_measure_patristic_steps=True,
+                is_measure_node_distances=False,
+                is_measure_node_steps=True,
+                is_measure_node_ages=False,
+                is_measure_coalescence_intervals=False, # artificially imposes requirements that each area/host has at least 2 symbiont lineages
+                is_normalize=True,
+                ultrametricity_precision=constants.DEFAULT_ULTRAMETRICITY_PRECISION,
+                tree_phylogenetic_distance_matrix=None,
+                tree_node_distance_matrix=None,
+                tree_id=None,
+                is_skip_normalization_on_zero_division_error=True,
+                )
+        return tree_profile
+
     def get_profile_for_tree(self, tree):
         tree_profile = profiledistance.TreeProfile(
                 tree=tree,
@@ -154,6 +177,8 @@ class SummaryStatsCalculator(object):
                 membership_element_type=dendropy.Node,
                 only_include_taxa=set([nd.taxon for nd in self.host_history.extant_leaf_nodes]),
                 )
+        self.host_area_tree_profile = self.get_unweighted_profile_for_tree(self.host_area_tree)
+
         # self.host_area_assemblage_trees = self.generate_induced_trees(
         #         tree=self.host_tree,
         #         assemblage_leaf_sets=self.host_history.area_assemblage_leaf_sets,
@@ -190,6 +215,13 @@ class SummaryStatsCalculator(object):
                 membership_element_type=dendropy.Taxon,
                 # only_include_taxa=set([nd.taxon for nd in self.host_history.extant_leaf_nodes]),
                 )
+        symbiont_area_tree_profile = self.get_unweighted_profile_for_tree(symbiont_area_tree)
+        self.compare_profiles(
+                profile1=self.host_area_tree_profile,
+                profile2=symbiont_area_tree_profile,
+                fieldname_prefix="predictor.profiledist.area.trees.",
+                fieldname_suffix="",
+                results=results)
 
         symbiont_pdm = symbiont_phylogeny.phylogenetic_distance_matrix()
 
