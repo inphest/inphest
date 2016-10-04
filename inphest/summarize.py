@@ -171,13 +171,14 @@ class SummaryStatsCalculator(object):
         self.host_history = host_history
         self.host_tree = host_history.tree
         assert host_history.tree.taxon_namespace is self.host_history.taxon_namespace
-        self.host_area_tree = estimate_tree_from_assemblage_leafsets(
-                assemblage_memberships=self.host_history.area_assemblage_leaf_sets,
-                taxon_namespace=self.host_history.taxon_namespace,
-                membership_element_type=dendropy.Node,
-                only_include_taxa=set([nd.taxon for nd in self.host_history.extant_leaf_nodes]),
-                )
-        self.host_area_tree_profile = self.get_unweighted_profile_for_tree(self.host_area_tree)
+
+        # self.host_area_tree = estimate_tree_from_assemblage_leafsets(
+        #         assemblage_memberships=self.host_history.area_assemblage_leaf_sets,
+        #         taxon_namespace=self.host_history.taxon_namespace,
+        #         membership_element_type=dendropy.Node,
+        #         only_include_taxa=set([nd.taxon for nd in self.host_history.extant_leaf_nodes]),
+        #         )
+        # self.host_area_tree_profile = self.get_unweighted_profile_for_tree(self.host_area_tree)
 
         # self.host_area_assemblage_trees = self.generate_induced_trees(
         #         tree=self.host_tree,
