@@ -209,19 +209,20 @@ class SummaryStatsCalculator(object):
 
         results = collections.OrderedDict()
 
-        symbiont_area_tree = estimate_tree_from_assemblage_leafsets(
-                assemblage_memberships=symbiont_phylogeny_leaf_sets_by_area,
-                taxon_namespace=symbiont_phylogeny.taxon_namespace,
-                membership_element_type=dendropy.Taxon,
-                # only_include_taxa=set([nd.taxon for nd in self.host_history.extant_leaf_nodes]),
-                )
-        symbiont_area_tree_profile = self.get_unweighted_profile_for_tree(symbiont_area_tree)
-        self.compare_profiles(
-                profile1=self.host_area_tree_profile,
-                profile2=symbiont_area_tree_profile,
-                fieldname_prefix="predictor.profiledist.area.trees.",
-                fieldname_suffix="",
-                results=results)
+        ### DISABLING TREE-ESTIMATION AND PROFILE DISTANCE STATS FOR NOW
+        # symbiont_area_tree = estimate_tree_from_assemblage_leafsets(
+        #         assemblage_memberships=symbiont_phylogeny_leaf_sets_by_area,
+        #         taxon_namespace=symbiont_phylogeny.taxon_namespace,
+        #         membership_element_type=dendropy.Taxon,
+        #         # only_include_taxa=set([nd.taxon for nd in self.host_history.extant_leaf_nodes]),
+        #         )
+        # symbiont_area_tree_profile = self.get_unweighted_profile_for_tree(symbiont_area_tree)
+        # self.compare_profiles(
+        #         profile1=self.host_area_tree_profile,
+        #         profile2=symbiont_area_tree_profile,
+        #         fieldname_prefix="predictor.profiledist.area.trees.",
+        #         fieldname_suffix="",
+        #         results=results)
 
         symbiont_pdm = symbiont_phylogeny.phylogenetic_distance_matrix()
 
