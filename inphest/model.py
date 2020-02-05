@@ -655,14 +655,17 @@ class HostLineage(object):
                     else:
                         assert self not in area.host_lineages
         else:
-            if self.extancy == "pre":
-                assert simulation_elapsed_time <= self.start_time
-                assert simulation_elapsed_time <= self.end_time
-            elif self.extancy == "post":
-                assert simulation_elapsed_time >= self.start_time
-                assert abs(simulation_elapsed_time - self.end_time) < 1e-6 or simulation_elapsed_time >= self.end_time, "False: {} >= {}".format(simulation_elapsed_time, self.end_time)
+            if simulation_elapsed_time is None:
+                pass
             else:
-                raise ValueError(self.extancy)
+                if self.extancy == "pre":
+                    assert simulation_elapsed_time <= self.start_time
+                    assert simulation_elapsed_time <= self.end_time
+                elif self.extancy == "post":
+                    assert simulation_elapsed_time >= self.start_time
+                    assert abs(simulation_elapsed_time - self.end_time) < 1e-6 or simulation_elapsed_time >= self.end_time, "False: {} >= {}".format(simulation_elapsed_time, self.end_time)
+                else:
+                    raise ValueError(self.extancy)
             for area in self.host_system.areas:
                 assert self not in area.host_lineages
 
